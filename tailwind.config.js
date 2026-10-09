@@ -1,0 +1,55 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        ink: "#16283D",
+        paper: "#E9EEF3",
+        card: "#FFFFFF",
+        rule: "#D8E0E8",
+        muted: "#64798F",
+        blue: "#1B4D8F",
+        "blue-dk": "#143A6B",
+        "blue-soft": "#EAF1F9",
+        red: "#B3261E",
+        "red-soft": "#FBEAE8",
+        amber: "#B45309",
+        "amber-soft": "#FDF3E5",
+        green: "#0F7B5A",
+        "green-soft": "#E7F4EF",
+        zebra: "#FBFCFD",
+      },
+      fontFamily: {
+        sans: [
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
+        mono: [
+          "ui-monospace",
+          "SFMono-Regular",
+          "SF Mono",
+          "Menlo",
+          "Consolas",
+          "Liberation Mono",
+          "monospace",
+        ],
+      },
+      fontSize: {
+        col: ["9.5px", { lineHeight: "1.2", letterSpacing: "0.09em" }],
+        row: ["13px", { lineHeight: "1.35" }],
+        fig: ["14.5px", { lineHeight: "1.2" }],
+        note: ["11px", { lineHeight: "1.45" }],
+        verdict: ["18px", { lineHeight: "1.3" }],
+      },
+    },
+  },
+  plugins: [],
+};

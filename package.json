@@ -1,0 +1,54 @@
+{
+  "name": "seven-seas-material-flow",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:web": "vite",
+    "dev:server": "tsx watch --clear-screen=false server/src/index.ts",
+    "build": "npm run typecheck && vite build && npm run build:server",
+    "build:server": "esbuild server/src/index.ts server/scripts/setup.ts server/scripts/demo.ts server/scripts/user.ts server/scripts/snapshot.ts server/scripts/master.ts server/scripts/init-env.ts --bundle --platform=node --target=node20 --format=esm --packages=external --outdir=dist-server --out-extension:.js=.mjs",
+    "start": "node dist-server/src/index.mjs",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p server",
+    "env:init": "tsx server/scripts/init-env.ts",
+    "db:setup": "tsx server/scripts/setup.ts",
+    "db:demo": "tsx server/scripts/demo.ts",
+    "user": "tsx server/scripts/user.ts",
+    "preview": "vite preview",
+    "test:api": "node server/test/security.mjs",
+    "snapshot": "tsx server/scripts/snapshot.ts",
+    "master": "tsx server/scripts/master.ts"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^18.0.6",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "lucide-react": "^0.451.0",
+    "mysql2": "^3.24.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.4",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.2",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^10.0.5",
+    "esbuild": "^0.28.2",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "tsx": "^4.23.15",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.21"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,220 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #16283d;
+  --paper: #e9eef3;
+  --card: #ffffff;
+  --rule: #d8e0e8;
+  --muted: #64798f;
+
+  --blue: #1b4d8f;
+  --blue-dk: #143a6b;
+  --blue-soft: #eaf1f9;
+
+  --red: #b3261e;
+  --red-soft: #fbeae8;
+  --amber: #b45309;
+  --amber-soft: #fdf3e5;
+  --green: #0f7b5a;
+  --green-soft: #e7f4ef;
+
+  color-scheme: light;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: theme("fontFamily.sans");
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Every figure in the app is tabular so columns line up. */
+  .num {
+    font-family: theme("fontFamily.mono");
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  input,
+  button,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Numeric inputs use the same tabular figures as the tables. */
+  input.num {
+    font-family: theme("fontFamily.mono");
+  }
+
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+    border-radius: 2px;
+  }
+}
+
+@layer components {
+  /* §6.3 — the missing portion of a short row, drawn as a thing, not as absence. */
+  .hatch {
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent 0 3px,
+      rgba(179, 38, 30, 0.28) 3px 6px
+    );
+  }
+
+  .col-head {
+    font-size: 9.5px;
+    line-height: 1.2;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--rule);
+    background: var(--card);
+    color: var(--ink);
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) {
+    background: var(--blue-soft);
+    border-color: #b9cbe0;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--blue-dk);
+    border-color: var(--blue-dk);
+  }
+
+  .btn-toggle-on {
+    background: var(--blue-soft);
+    border-color: var(--blue);
+    color: var(--blue-dk);
+  }
+
+  .field {
+    height: 34px;
+    width: 100%;
+    padding: 0 9px;
+    border: 1px solid var(--rule);
+    background: #fff;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+  .field:hover {
+    border-color: #b9cbe0;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ── §7.5 print view: verdict + requirement table on A4 portrait ───────────── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto;
+    background: #fff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-root {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .print-scroll {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  .print-sticky {
+    position: static !important;
+  }
+
+  .print-block {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .card {
+    border-color: #b6c2ce;
+    break-inside: auto;
+  }
+
+  .print-row {
+    break-inside: avoid;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+}
+
+.print-only {
+  display: none;
+}
