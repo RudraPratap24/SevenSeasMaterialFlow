@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "../auth";
 import { useFlow } from "../store";
-import { Card, Chip, EmptyNote, StatusChip, Table, Td, Tr, fmt } from "../ui";
+import { Card, Chip, EmptyNote, StatusChip, Table, Td, Tr, fmt, fmtQty } from "../ui";
 import type { QcStatus } from "../types";
 
 export function QcTab() {
   const { state, fgStock, recordAr, recordPdi } = useFlow();
+  const unitOf = new Map(state.grnLines.map((g) => [g.grnNo, g.unit]));
   const { can } = useAuth();
   const [remarks, setRemarks] = useState<Record<string, string>>({});
 
@@ -50,7 +51,7 @@ export function QcTab() {
                   <Td num strong>{q.id}</Td>
                   <Td num>{q.grnNo}</Td>
                   <Td>{q.productName}</Td>
-                  <Td right num>{fmt(q.totalQty)}</Td>
+                  <Td right num>{fmtQty(q.totalQty, unitOf.get(q.grnNo))}</Td>
                   <Td>{ar ? <StatusChip status="HOLD" /> : <StatusChip status="UNDER_TEST" />}</Td>
                   {mayDecide && (
                     <>
@@ -191,7 +192,7 @@ export function QcTab() {
                 <Td num>{q.batchNo || "—"}</Td>
                 <Td num>{q.mfgDate || "—"}</Td>
                 <Td num>{q.expiryDate || "—"}</Td>
-                <Td right num>{fmt(q.totalQty)}</Td>
+                <Td right num>{fmtQty(q.totalQty, unitOf.get(q.grnNo))}</Td>
                 <Td right num>{q.totalBox === null ? "—" : fmt(q.totalBox)}</Td>
                 <Td muted>{q.remark || "—"}</Td>
               </Tr>
@@ -228,7 +229,7 @@ export function QcTab() {
                   <Td num>{a.intimationId}</Td>
                   <Td num>{q?.grnNo ?? "—"}</Td>
                   <Td>{q?.productName ?? "—"}</Td>
-                  <Td right num>{q ? fmt(q.totalQty) : "—"}</Td>
+                  <Td right num>{q ? fmtQty(q.totalQty, unitOf.get(q.grnNo)) : "—"}</Td>
                   <Td><StatusChip status={a.status} /></Td>
                   <Td muted>{a.remark || "—"}</Td>
                 </Tr>

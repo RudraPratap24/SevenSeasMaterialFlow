@@ -14,7 +14,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import type { ActionName, DocCollection, Series } from "../../src/flow/logic";
 import type { Queryable } from "./db";
-import type { Slice } from "./repository";
+import { toSqlDate, type Slice } from "./repository";
 
 export interface Plan {
   targets: { c: DocCollection; key: string }[];
@@ -74,14 +74,66 @@ const grnPlan = (grnNo: string): Plan => ({
 });
 
 export const PLANS: Record<ActionName, Planner> = {
-  addGateEntry: async () => ({ targets: [], locks: [], slice: {}, series: "GE" }),
+  addGateEntry: async ([e]) => {
+    const { poNo, invoiceNo } = e as { poNo: string; invoiceNo: string };
+    const gate: string[] = [];
+    const params: unknown[] = [];
+    if (invoiceNo) {
+      gate.push("h.invoice_no = ?"); // duplicate-invoice check
+      params.push(invoiceNo);
+    }
+    if (poNo) {
+      gate.push("h.tally_po_no = ? OR h.po_no = ?"); // what has already come in against the PO
+      params.push(poNo, poNo);
+    }
+    return {
+      targets: [],
+      // Two vehicles for the same PO, or one invoice entered twice at once, are checked one after the other.
+      locks: [...(poNo ? [`tally-po:${poNo}`] : []), ...(invoiceNo ? [`gate-invoice:${invoiceNo.toLowerCase()}`] : [])],
+      slice: {
+        gateEntries: gate.length ? { sql: gate.join(" OR "), params } : none,
+        // Store's GRN counts replace the gate quantities in what the PO has received.
+        ...(poNo
+          ? {
+              tallyPos: eq("po_no", poNo),
+              purchaseOrders: eq("po_no", poNo),
+              poClosures: eq("po_no", poNo),
+              grnLines: { sql: "g.tally_po_no = ? OR g.po_no = ?", params: [poNo, poNo] },
+            }
+          : {}),
+      },
+      series: "GE",
+    };
+  },
+
+  recordVehicleOut: async ([id]) => ({
+    targets: [{ c: "gateEntries", key: String(id) }],
+    locks: [],
+    slice: { gateEntries: eq("gate_entry_no", id) },
+  }),
 
   addGrnLine: async ([l]) => {
     const gateEntryId = (l as { gateEntryId: string }).gateEntryId;
-    return { targets: [], locks: [], slice: { gateEntries: eq("gate_entry_no", gateEntryId) }, series: "GR" };
+    return {
+      targets: [],
+      // Two clerks making a GRN for the same gate-checked item: the second one sees the first.
+      locks: [`gate-grn:${gateEntryId}`],
+      slice: {
+        gateEntries: eq("gate_entry_no", gateEntryId),
+        grnLines: eq("gate_entry_no", gateEntryId),
+        tallyPos: { sql: "h.po_no = (SELECT tally_po_no FROM gate_entries WHERE gate_entry_no = ?)", params: [gateEntryId] },
+        purchaseOrders: { sql: "h.po_no = (SELECT po_no FROM gate_entries WHERE gate_entry_no = ?)", params: [gateEntryId] },
+      },
+      series: "GR",
+    };
   },
 
-  updateGrnQty: async ([grnNo]) => grnPlan(String(grnNo)),
+  updateGrnQty: async ([grnNo]) => {
+    const p = grnPlan(String(grnNo));
+    // The gate-checked quantity caps the count.
+    const gate = { sql: "h.gate_entry_no = (SELECT gate_entry_no FROM goods_receipts WHERE grn_no = ?)", params: [grnNo] };
+    return { ...p, slice: { ...p.slice, gateEntries: gate } };
+  },
   setBarcoded: async ([grnNo]) => grnPlan(String(grnNo)),
   sendToQc: async ([grnNo]) => ({ ...grnPlan(String(grnNo)), series: "QCI" }),
 
@@ -184,4 +236,32 @@ export const PLANS: Record<ActionName, Planner> = {
     locks: [],
     slice: { purchaseOrders: eq("po_no", id) },
   }),
+
+  closePo: async ([po]) => poClosurePlan(String(po)),
+  reopenPo: async ([po]) => poClosurePlan(String(po)),
+
+  // The one-time cut-over reads every PO before the date and what came in against any PO.
+  closePosBefore: async ([before]) => {
+    const day = toSqlDate(String(before));
+    return {
+      targets: [],
+      locks: ["po-closures:cutover"],
+      slice: {
+        tallyPos: { sql: "h.po_date < ?", params: [day] },
+        purchaseOrders: { sql: "h.po_date < ?", params: [day] },
+        poClosures: { sql: "1 = 1", params: [] },
+        gateEntries: { sql: "h.tally_po_no IS NOT NULL OR h.po_no IS NOT NULL", params: [] },
+        grnLines: { sql: "g.tally_po_no IS NOT NULL OR g.po_no IS NOT NULL", params: [] },
+      },
+    };
+  },
 };
+
+/** One PO's closure, with the PO itself (Tally copy or app PO) to check it exists. */
+function poClosurePlan(poNo: string): Plan {
+  return {
+    targets: [{ c: "poClosures", key: poNo }],
+    locks: [],
+    slice: { poClosures: eq("po_no", poNo), tallyPos: eq("po_no", poNo), purchaseOrders: eq("po_no", poNo) },
+  };
+}

@@ -17,6 +17,8 @@ function blank(): FlowState {
     dispatchSlips: [],
     indents: [],
     purchaseOrders: [],
+    tallyPos: [],
+    poClosures: [],
   };
 }
 

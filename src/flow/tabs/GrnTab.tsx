@@ -1,62 +1,92 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "../auth";
+import { awaitingGrn, isPcs, searchAwaitingGrn, type AwaitingGrn } from "../logic";
 import { todayLabel, useFlow } from "../store";
-import { Card, EmptyNote, Field, StatusChip, Table, Td, TextInput, Tr, fmt } from "../ui";
+import { Card, EmptyNote, Field, SearchPicker, StatusChip, Table, Td, Tr, fmt, fmtQty } from "../ui";
+
+interface Draft {
+  code: string;
+  perBox: string;
+  boxes: string;
+  total: string;
+  remark: string;
+}
 
 export function GrnTab({ onTrace }: { onTrace: (grnNo: string) => void }) {
   const { state, addGrnLine, sendToQc, setBarcoded, updateGrnQty, masters } = useFlow();
   const COMPONENTS = masters.components;
   const { can } = useAuth();
   const [open, setOpen] = useState(false);
-  const [gateEntryId, setGateEntryId] = useState("");
-  const [code, setCode] = useState("");
-  const [qtyPerBox, setQtyPerBox] = useState("");
-  const [boxes, setBoxes] = useState("");
-
-  const comp = masters.componentByCode.get(code.trim().toUpperCase());
-  const gate = state.gateEntries.find((g) => g.id === gateEntryId);
-  const totalQty = (Number(qtyPerBox) || 0) * (Number(boxes) || 0);
+  const [search, setSearch] = useState("");
+  /** What Store has typed per waiting item, keyed "GE-0006:2" (":0" = arrival without PO). */
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
   const intimatedGrns = useMemo(
     () => new Set(state.qcIntimations.map((q) => q.grnNo)),
     [state.qcIntimations],
   );
+  const waiting = useMemo(() => awaitingGrn(state.gateEntries, state.grnLines), [state.gateEntries, state.grnLines]);
 
-  /** One click, no typing: latest gate entry + the BL-686 ready-stock component. */
+  /** The PMS code Store used before for a Tally item that has none of its own. */
+  const remembered = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const g of state.grnLines) {
+      const line =
+        g.gateLineNo === null ? undefined : state.gateEntries.find((e) => e.id === g.gateEntryId)?.lines[g.gateLineNo - 1];
+      if (line) m.set(line.itemName, g.componentCode);
+    }
+    return m;
+  }, [state.grnLines, state.gateEntries]);
+
+  const keyOf = (w: AwaitingGrn) => `${w.gate.id}:${w.lineNo ?? 0}`;
+  const draftOf = (w: AwaitingGrn): Draft =>
+    drafts[keyOf(w)] ?? {
+      code: w.line ? w.line.itemCode || remembered.get(w.line.itemName) || "" : "",
+      perBox: "",
+      boxes: "",
+      total: w.line ? String(w.line.qty) : "",
+      remark: "",
+    };
+  const setDraft = (w: AwaitingGrn, patch: Partial<Draft>) =>
+    setDrafts((d) => ({ ...d, [keyOf(w)]: { ...draftOf(w), ...patch } }));
+  /** Counted in boxes (qty in 1 box × boxes) or as a total — Kg and Doz items usually as a total. */
+  const countOf = (d: Draft) => (d.perBox && d.boxes ? Number(d.perBox) * Number(d.boxes) : Number(d.total) || 0);
+
+  const shown = searchAwaitingGrn(waiting, search);
+
+  /** One click, no typing: the first item waiting for GRN, counted exactly as checked in at the gate. */
   function fillDemo() {
-    const latest = state.gateEntries[state.gateEntries.length - 1];
-    if (!latest) return;
-    setGateEntryId(latest.id);
-    setCode("PMS0014");
-    setQtyPerBox("100");
-    setBoxes("24");
+    const w = waiting[0];
+    if (w) setDraft(w, { code: draftOf(w).code || "PMS0014", total: String(w.line?.qty ?? w.gate.invoiceQty ?? 2400) });
     setOpen(true);
   }
 
-  async function save() {
-    if (!comp || !gate || totalQty <= 0) return;
+  async function save(w: AwaitingGrn) {
+    const d = draftOf(w);
+    const comp = masters.componentByCode.get(d.code.trim().toUpperCase());
+    const total = countOf(d);
+    if (!comp || total <= 0) return;
+    const inBoxes = Boolean(d.perBox && d.boxes);
     const ok = await addGrnLine({
-      gateEntryId: gate.id,
+      gateEntryId: w.gate.id,
+      gateLineNo: w.lineNo,
       componentCode: comp.code,
       componentName: comp.name,
       type: comp.type,
       brandName: "SEVEN SEAS",
       receivedDate: todayLabel(),
-      poNo: gate.poNo,
+      poNo: w.gate.poNo,
       poQty: null,
       location: "Store — Floor 1",
-      invoiceNo: gate.invoiceNo,
-      supplierName: gate.supplierName,
-      qtyPerBox: Number(qtyPerBox),
-      totalBoxes: Number(boxes),
-      totalQty,
-      remarkStore: "",
+      invoiceNo: w.gate.invoiceNo,
+      supplierName: w.gate.supplierName,
+      qtyPerBox: inBoxes ? Number(d.perBox) : null,
+      totalBoxes: inBoxes ? Number(d.boxes) : null,
+      totalQty: total,
+      unit: "",
+      remarkStore: d.remark.trim(),
     });
-    if (!ok) return;
-    setCode("");
-    setQtyPerBox("");
-    setBoxes("");
-    setOpen(false);
+    if (ok) setDrafts(({ [keyOf(w)]: _, ...rest }) => rest);
   }
 
   return (
@@ -71,79 +101,144 @@ export function GrnTab({ onTrace }: { onTrace: (grnNo: string) => void }) {
               <button
                 className="btn"
                 onClick={fillDemo}
-                disabled={state.gateEntries.length === 0}
-                title={
-                  state.gateEntries.length === 0
-                    ? "Make a gate entry first"
-                    : "Fill the form with example values against the latest gate entry"
-                }
+                disabled={waiting.length === 0}
+                title={waiting.length === 0 ? "Nothing is waiting for GRN" : "Fill the first waiting item with example values"}
               >
                 Enter demo data
               </button>
               <button className={`btn ${open ? "" : "btn-primary"}`} onClick={() => setOpen(!open)}>
-                {open ? "Close" : "New GRN"}
+                {open ? "Close" : `New GRN (${waiting.length} waiting)`}
               </button>
             </>
           ) : null
         }
       >
         {open && can("grn.create") && (
-          <div className="border-b border-rule bg-zebra px-3 py-3">
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-              <Field label="Against gate entry">
-                <select
-                  className="field h-8"
-                  value={gateEntryId}
-                  onChange={(e) => setGateEntryId(e.target.value)}
-                  aria-label="Against gate entry"
-                >
-                  <option value="">Select…</option>
-                  {state.gateEntries
-                    .slice()
-                    .reverse()
-                    .map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.id} — {g.supplierName}
-                      </option>
-                    ))}
-                </select>
-              </Field>
-              <Field label="Component code">
-                <TextInput
-                  value={code}
-                  onChange={setCode}
-                  placeholder="PMS0164"
-                  ariaLabel="Component code"
-                  list="component-codes"
-                />
-              </Field>
-              <Field label="Component name">
-                <div className="field flex h-8 items-center truncate text-[12px] text-muted">
-                  {comp ? comp.name : "Type a PMS code"}
-                </div>
-              </Field>
-              <Field label="Qty in 1 box">
-                <TextInput value={qtyPerBox} onChange={setQtyPerBox} numeric placeholder="30" />
-              </Field>
-              <Field label="Total boxes">
-                <TextInput value={boxes} onChange={setBoxes} numeric placeholder="100" />
-              </Field>
+          <div className="space-y-2 border-b border-rule bg-zebra px-3 py-3">
+            <Field label="Find what has come in — PO number, supplier, item name, PMS code or gate entry">
+              <input
+                className="field h-8 w-full"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="e.g. 26SEV301, MAXCOMM, EYELINER, PMS0843, GE-0006"
+                autoFocus
+              />
+            </Field>
+            <div className="rounded border border-rule bg-white">
+              <Table
+                minWidth={1250}
+                headers={[
+                  "Gate entry",
+                  "PO no",
+                  "Supplier",
+                  "Item",
+                  { label: "At gate", align: "right" },
+                  "PMS code",
+                  { label: "Qty in 1 box", align: "right" },
+                  { label: "Boxes", align: "right" },
+                  { label: "Total counted", align: "right" },
+                  "Remark",
+                  "",
+                ]}
+              >
+                {shown.slice(0, 50).map((w, i) => {
+                  const d = draftOf(w);
+                  const comp = masters.componentByCode.get(d.code.trim().toUpperCase());
+                  const unit = w.line?.unit ?? "";
+                  const total = countOf(d);
+                  const short = w.line !== null && total > 0 && total < w.line.qty;
+                  const inBoxes = Boolean(d.perBox && d.boxes);
+                  return (
+                    <Tr key={keyOf(w)} zebra={i % 2 === 1}>
+                      <Td num strong>{w.gate.id}</Td>
+                      <Td num>{w.gate.poNo || "—"}</Td>
+                      <Td>{w.gate.supplierName}</Td>
+                      <Td>{w.line?.itemName ?? (w.gate.productDesc || "—")}</Td>
+                      <Td right num>
+                        {w.line ? fmtQty(w.line.qty, unit) : w.gate.invoiceQty === null ? "—" : fmtQty(w.gate.invoiceQty)}
+                      </Td>
+                      <Td>
+                        {w.line?.itemCode ? (
+                          <span className="num">{w.line.itemCode}</span>
+                        ) : (
+                          <SearchPicker
+                            className="field num h-7 w-24"
+                            value={d.code}
+                            onChange={(v) => setDraft(w, { code: v })}
+                            placeholder="PMS…"
+                            minWidth={320}
+                            ariaLabel={`PMS code for ${w.line?.itemName ?? w.gate.id}`}
+                            options={COMPONENTS.map((c) => ({ value: c.code, hint: c.name }))}
+                          />
+                        )}
+                      </Td>
+                      <Td right>
+                        <input
+                          className="field num h-7 w-20 text-right"
+                          inputMode="numeric"
+                          value={d.perBox}
+                          onChange={(e) => setDraft(w, { perBox: e.target.value.replace(/[^\d]/g, "") })}
+                          aria-label="Qty in 1 box"
+                        />
+                      </Td>
+                      <Td right>
+                        <input
+                          className="field num h-7 w-16 text-right"
+                          inputMode="numeric"
+                          value={d.boxes}
+                          onChange={(e) => setDraft(w, { boxes: e.target.value.replace(/[^\d]/g, "") })}
+                          aria-label="Boxes"
+                        />
+                      </Td>
+                      <Td right>
+                        {inBoxes ? (
+                          <span className="num font-semibold">{fmtQty(total, unit)}</span>
+                        ) : (
+                          <span className="flex items-center justify-end gap-1">
+                            <input
+                              className="field num h-7 w-24 text-right"
+                              inputMode="decimal"
+                              value={d.total}
+                              onChange={(e) => setDraft(w, { total: e.target.value.replace(/[^\d.]/g, "") })}
+                              aria-label="Total counted"
+                            />
+                            <span className="text-[11px] text-muted">{unit || "pcs"}</span>
+                          </span>
+                        )}
+                      </Td>
+                      <Td>
+                        <input
+                          className="field h-7 w-40"
+                          value={d.remark}
+                          onChange={(e) => setDraft(w, { remark: e.target.value })}
+                          placeholder={short ? "Counted short — why?" : "Optional"}
+                          aria-label="Store remark"
+                        />
+                      </Td>
+                      <Td>
+                        <button
+                          className="btn btn-primary h-7 px-2 text-[11px]"
+                          onClick={() => save(w)}
+                          disabled={!comp || total <= 0}
+                        >
+                          Create GRN
+                        </button>
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </Table>
+              {shown.length === 0 && (
+                <EmptyNote>
+                  {waiting.length === 0 ? "Nothing is waiting for GRN." : `Nothing waiting matches "${search.trim()}".`}
+                </EmptyNote>
+              )}
             </div>
-            <datalist id="component-codes">
-              {COMPONENTS.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.name}
-                </option>
-              ))}
-            </datalist>
-            <div className="mt-3 flex items-center gap-3">
-              <button className="btn btn-primary" onClick={save} disabled={!comp || !gate || totalQty <= 0}>
-                Create GRN — total {fmt(totalQty)} pcs
-              </button>
-              <span className="text-[11px] text-muted">
-                New GRN goes to quarantine as UNDER TEST until QC decides.
-              </span>
-            </div>
+            <p className="text-[11px] text-muted">
+              One GRN per item, in the PO's unit. Count in boxes, or type the total (Kg, Doz). The count can't be more
+              than was checked in at the gate; a short count stays pending on the PO. New GRNs go to quarantine as
+              UNDER TEST until QC decides.
+            </p>
           </div>
         )}
 
@@ -190,10 +285,11 @@ export function GrnTab({ onTrace }: { onTrace: (grnNo: string) => void }) {
                     <QtyCell
                       grnNo={g.grnNo}
                       value={g.totalQty}
+                      decimals={!isPcs(g.unit)}
                       onCommit={(v) => updateGrnQty(g.grnNo, v)}
                     />
                   ) : (
-                    fmt(g.totalQty)
+                    fmtQty(g.totalQty, g.unit)
                   )}
                 </Td>
                 <Td><StatusChip status={g.qcStatus} /></Td>
@@ -238,8 +334,9 @@ export function GrnTab({ onTrace }: { onTrace: (grnNo: string) => void }) {
         Columns match your GRN sheet exactly — SR NO · COMPONENT NAME · TYPE · COMPONENT CODE ·
         BRAND NAME · RECEIVED DATE · GATE ENTRY NO · PO NO · PO QTY · INVOICE NO · SUPPLIER NAME ·
         QTY IN 1 BOX · TOTAL BOX RECEIVED · TOTAL QTY RECEIVED · REMARK STORE · GRN NO. (With
-        demo data loaded, GR0001–GR0003 are the real rows from your sheet.) New material waits
-        in quarantine (UNDER TEST) until QC approves — step 5 of the SOP. The quantity can be
+        demo data loaded, GR0001–GR0003 are the real rows from your sheet.) Items checked in at the
+        gate wait here for their GRN; Store's count is what the PO counts as received. New material
+        waits in quarantine (UNDER TEST) until QC approves — step 5 of the SOP. The quantity can be
         corrected only until the GRN is sent to QC; from then on every passed stage is locked.
       </p>
     </div>
@@ -250,10 +347,13 @@ export function GrnTab({ onTrace }: { onTrace: (grnNo: string) => void }) {
 function QtyCell({
   grnNo,
   value,
+  decimals,
   onCommit,
 }: {
   grnNo: string;
   value: number;
+  /** Kg, Doz … from the PO: decimals allowed. */
+  decimals: boolean;
   onCommit: (v: number) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -261,15 +361,15 @@ function QtyCell({
     <input
       className="num h-7 w-[90px] rounded-[2px] border border-transparent bg-transparent text-right text-[12.5px] font-bold hover:border-rule focus:border-blue focus:bg-white"
       type="text"
-      inputMode="numeric"
+      inputMode={decimals ? "decimal" : "numeric"}
       aria-label={`Total qty for ${grnNo}`}
       title="Editable while in quarantine"
-      value={draft ?? fmt(value)}
+      value={draft ?? value.toLocaleString("en-IN", { maximumFractionDigits: 3 })}
       onFocus={(e) => {
         setDraft(String(value));
         window.setTimeout(() => e.target.select(), 0);
       }}
-      onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ""))}
+      onChange={(e) => setDraft(e.target.value.replace(decimals ? /[^\d.]/g : /[^\d]/g, ""))}
       onBlur={() => {
         if (draft !== null && draft !== String(value)) onCommit(Number(draft || 0));
         setDraft(null);

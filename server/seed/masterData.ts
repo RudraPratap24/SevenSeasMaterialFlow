@@ -28,9 +28,9 @@ const INV = inventoryJson as InvRow[];
  * codes seen on the real GRN sheet (PMS0848 tray, PMS0849 barcode).
  */
 export const SEED_COMPONENTS: ComponentInfo[] = [
-  ...INV.map((r) => ({ code: r.code, name: r.name, type: r.type })),
-  { code: "PMS0848", name: "LL-112 TRAY (POP)", type: "POP" },
-  { code: "PMS0849", name: "BARCODE LABEL SEVEN SEAS", type: "Barcode" },
+  ...INV.map((r) => ({ code: r.code, name: r.name, type: r.type, unit: "" })),
+  { code: "PMS0848", name: "LL-112 TRAY (POP)", type: "POP", unit: "" },
+  { code: "PMS0849", name: "BARCODE LABEL SEVEN SEAS", type: "Barcode", unit: "" },
 ];
 
 /** Units per box from the product's own BOM "…box N pcs" line (p = 100/N). */

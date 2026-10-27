@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AuthProvider, ChangePasswordScreen, LoginScreen, useAuth } from "./auth";
+import { AuthProvider, ChangePasswordScreen, LoginScreen, useAuth, Wordmark } from "./auth";
 import { FlowProvider, useFlow, type ResetResult, type TabId } from "./store";
-import { fmt } from "./ui";
+import { fmt, Icon } from "./ui";
+import { awaitingGrn, deriveTallyPoProgress, gatePos } from "./logic";
 import { FlowTab } from "./tabs/FlowTab";
 import { GateTab } from "./tabs/GateTab";
 import { GrnTab } from "./tabs/GrnTab";
@@ -23,6 +24,9 @@ const TAB_LABELS: Record<TabId, string> = {
   dispatch: "Dispatch",
   purchase: "Purchase",
 };
+
+const HEAD_BTN =
+  "flex h-[34px] items-center gap-2 rounded-md border border-white/30 px-3 text-[12px] font-semibold text-white/90 hover:bg-white/10 disabled:opacity-50";
 
 export default function FlowApp() {
   return (
@@ -46,7 +50,7 @@ function Gate() {
 }
 
 function Shell() {
-  const { clearAll, loadDemo, traceBatch, traceGrn, epoch, loaded, busy, error, dismissError, masters } = useFlow();
+  const { clearAll, loadDemo, traceBatch, traceGrn, epoch, loaded, busy, error, dismissError } = useFlow();
   const { user, logout, can, canSee, isViewOnly, demoReset } = useAuth();
   const [tab, setTab] = useState<TabId>(user?.tabs[0] ?? "flow");
   const [changingPassword, setChangingPassword] = useState(false);
@@ -88,66 +92,42 @@ function Shell() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="flex h-[52px] shrink-0 items-center justify-between bg-ink px-5 text-white">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-[15.5px] font-bold tracking-[.01em]">
-            Seven Seas Beauty — Material Flow
-          </h1>
-          <span className="num hidden text-[11px] text-white/60 md:inline">
-            SOP/SCM/001 v2.1 · {fmt(masters.products.length)} products · {fmt(masters.components.length)} components
-          </span>
+      <header className="flex h-[60px] shrink-0 items-center justify-between gap-4 bg-ink px-6 text-white">
+        <div className="flex items-center gap-5">
+          <Wordmark light size={21} />
+          <span className="hidden h-7 w-px bg-white/25 sm:block" />
+          <h1 className="hidden text-[16px] font-bold sm:block">Material Flow</h1>
+          <span className="num hidden text-[11px] text-white/55 md:inline">SOP/SCM/001 v2.1</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           {mayReset && (
             <>
-              <button
-                className="rounded-[3px] border border-white/25 px-2.5 py-1 text-[11.5px] font-semibold text-white/85 hover:bg-white/10"
-                onClick={() => setResetOp("load")}
-                disabled={busy}
-                title="Replace every register on the server with a worked example"
-              >
-                Load demo data
+              <button className={HEAD_BTN} onClick={() => setResetOp("load")} disabled={busy} title="Replace every register on the server with a worked example">
+                <Icon name="database" /> <span className="hidden lg:inline">Load demo data</span>
               </button>
-              <button
-                className="rounded-[3px] border border-white/25 px-2.5 py-1 text-[11.5px] font-semibold text-white/85 hover:bg-white/10"
-                onClick={() => setResetOp("clear")}
-                disabled={busy}
-                title="Empty every register on the server and set all stock to zero"
-              >
-                Clear all
+              <button className={HEAD_BTN} onClick={() => setResetOp("clear")} disabled={busy} title="Empty every register on the server and set all stock to zero">
+                <Icon name="trash" /> <span className="hidden lg:inline">Clear all</span>
               </button>
             </>
           )}
-          <span className="ml-2 rounded-[3px] bg-white/15 px-2.5 py-1 text-[11.5px] font-bold">
-            {user?.label}
+          <span className="flex h-[34px] items-center gap-2 rounded-md border border-white/30 px-3 text-[12px] font-semibold">
+            <Icon name="user" /> {user?.label}
           </span>
-          <button
-            className="rounded-[3px] border border-white/25 px-2.5 py-1 text-[11.5px] font-semibold text-white/85 hover:bg-white/10"
-            onClick={() => setChangingPassword(true)}
-          >
-            Password
+          <button className={HEAD_BTN} onClick={() => setChangingPassword(true)}>
+            <Icon name="key" /> <span className="hidden md:inline">Password</span>
           </button>
-          <button
-            className="rounded-[3px] border border-white/25 px-2.5 py-1 text-[11.5px] font-semibold text-white/85 hover:bg-white/10"
-            onClick={() => void logout()}
-          >
-            Log out
+          <button className={HEAD_BTN} onClick={() => void logout()}>
+            <Icon name="logout" /> <span className="hidden md:inline">Log out</span>
           </button>
         </div>
       </header>
 
-      <nav
-        className="flex shrink-0 items-stretch overflow-x-auto border-b border-rule bg-card px-5"
-        aria-label="Registers"
-      >
+      <nav className="flex shrink-0 items-stretch overflow-x-auto border-b border-rule bg-card px-6" aria-label="Registers">
         {visibleTabs.map((t) => (
           <button
             key={t}
-            className="relative whitespace-nowrap px-3 py-2.5 text-[12px] font-bold uppercase tracking-[.06em]"
-            style={{
-              color: tab === t ? "var(--blue-dk)" : "var(--muted)",
-              boxShadow: tab === t ? "inset 0 -2px 0 var(--blue)" : "none",
-            }}
+            className={`relative whitespace-nowrap px-[18px] py-3.5 text-[12px] font-bold uppercase tracking-[.07em] ${tab === t ? "text-ink" : "text-muted hover:text-ink"}`}
+            style={{ boxShadow: tab === t ? "inset 0 -3px 0 var(--ink)" : "none" }}
             aria-current={tab === t ? "page" : undefined}
             onClick={() => setTab(t)}
           >
@@ -233,7 +213,7 @@ const RESET_COPY = {
     title: "Clear all registers",
     phrase: "CLEAR ALL",
     action: "Clear everything",
-    what: "Every gate entry, GRN, QC record, requisition, MRN, FG transfer, PDI, order, dispatch, indent and PO will be deleted for ALL departments, and every stock figure set to zero.",
+    what: "Every gate entry, GRN, QC record, requisition, MRN, FG transfer, PDI, order, dispatch, indent, PO and copy of the Tally POs will be deleted for ALL departments, and every stock figure set to zero.",
   },
   load: {
     title: "Load demo data",
@@ -376,7 +356,6 @@ function PendingStrip({ goTo }: { goTo: (t: TabId) => void }) {
   const { user, canSee } = useAuth();
   if (!user) return null;
 
-  const grnDone = new Set(state.grnLines.map((g) => g.gateEntryId));
   const decided = new Map(state.arRecords.map((a) => [a.intimationId, a.status]));
 
   const items: { label: string; count: number; tab: TabId }[] = [];
@@ -384,7 +363,7 @@ function PendingStrip({ goTo }: { goTo: (t: TabId) => void }) {
     if (count > 0 && canSee(tab)) items.push({ label, count, tab });
   };
 
-  const gateWithoutGrn = state.gateEntries.filter((g) => !grnDone.has(g.id)).length;
+  const waitingGrn = awaitingGrn(state.gateEntries, state.grnLines).length;
   const grnNotSent = state.grnLines.filter(
     (g) => g.qcStatus === "UNDER_TEST" && !state.qcIntimations.some((q) => q.grnNo === g.grnNo),
   ).length;
@@ -399,16 +378,14 @@ function PendingStrip({ goTo }: { goTo: (t: TabId) => void }) {
   const awaitingGateOut = state.dispatchSlips.filter((d) => d.invoiceNo && !d.gateOut).length;
   const posToApprove = poProgress.filter((p) => p.po.status === "PENDING_APPROVAL").length;
   const openOrders = orderProgress.filter((o) => o.open).length;
-  const approvedPosPending = poProgress.filter(
-    (p) => p.po.status === "APPROVED" && !p.closed,
-  ).length;
 
   switch (user.role) {
     case "gate":
-      add("PO arrivals expected", approvedPosPending, "gate");
+      add("open POs", deriveTallyPoProgress(gatePos(state), state.gateEntries, state.grnLines).filter((p) => p.open).length, "gate");
+      add("vehicles inside (no time out)", state.gateEntries.filter((g) => !g.timeOut).length, "gate");
       break;
     case "store":
-      add("gate entries without GRN", gateWithoutGrn, "grn");
+      add("items waiting for GRN", waitingGrn, "grn");
       add("GRNs to send to QC", grnNotSent, "grn");
       add("requisitions to issue", reqPending, "requisition");
       break;
@@ -448,17 +425,18 @@ function PendingStrip({ goTo }: { goTo: (t: TabId) => void }) {
   if (items.length === 0) return null;
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-rule bg-amber-soft px-5 py-2">
-      <span className="text-[11px] font-bold uppercase tracking-[.07em]" style={{ color: "var(--amber)" }}>
-        Your pending work
+    <div className="flex shrink-0 flex-wrap items-center gap-2.5 border-b border-rule bg-amber-soft px-6 py-2.5">
+      <span className="flex items-center gap-2 text-[11.5px] font-bold uppercase tracking-[.07em]" style={{ color: "var(--amber)" }}>
+        <Icon name="bell" /> Your pending work
       </span>
       {items.map((it) => (
         <button
           key={it.label}
-          className="rounded-[3px] border border-rule bg-card px-2 py-1 text-[11.5px] font-semibold hover:bg-blue-soft"
+          className="rounded-md border border-[#EADBC2] bg-card px-3 py-1 text-[12px] font-semibold hover:border-[var(--amber)]"
+          style={{ color: "var(--amber)" }}
           onClick={() => goTo(it.tab)}
         >
-          <b className="num">{fmt(it.count)}</b> {it.label}
+          <span className="num">{fmt(it.count)}</span> {it.label}
         </button>
       ))}
     </div>

@@ -5,7 +5,7 @@ complete 22-step flow from a material vehicle at the factory gate to finished-go
 gate-out. Every register mirrors one of the client's own documents, column for column.
 
 React + Vite frontend, Node.js + Express backend (TypeScript), MySQL 8 relational database
-(see `docs/DATABASE_DESIGN.md`). Department logins, role-based
+(see `docs/DATABASE_DESIGN.md`; every endpoint with real requests and responses in `docs/API.md`). Department logins, role-based
 access enforced on the server, sensitive fields encrypted at rest, every action audited.
 
 ## Run it locally (Laragon MySQL)
@@ -61,6 +61,48 @@ npm run master -- rename-supplier "Aplay Creation" "Aplay Creations Pvt Ltd"
 npm run master -- rename-customer "Meera Cosmetics" "Meera Cosmetics LLP"
 ```
 
+## Tally (MySQL keeps the copy)
+
+The app never calls Tally from a screen. A sync reads Tally and keeps a copy in MySQL; every screen reads
+MySQL only, so the app keeps working when Tally is closed or offline. The only write: an approved PO (below).
+
+```bash
+npm run tally -- sync            # what changed in Tally since the last sync (by Tally's AlterID)
+npm run tally -- sync --full     # everything again; POs deleted in Tally are marked cancelled
+npm run tally -- watch           # the above every TALLY_SYNC_SECONDS (30), full once a day — `npm run dev` starts it;
+                                 # on its own: if Tally is closed it records why (Purchase screen) and retries
+npm run tally -- import <file>   # POs from an "Export → XML (Data Interchange)" file instead
+npm run tally -- push <PO no> [--date yyyymmdd]   # create a PO raised + approved here in Tally (see below)
+```
+
+**Creating a PO in Tally** (the only write to Tally) is off unless `TALLY_ALLOW_WRITE=true` — use it on a
+test copy of Tally until Accounts agrees (Educational mode takes only the 1st or 2nd: set `TALLY_TEST_DATE`,
+e.g. `20261001`, or `--date`). When on, **approving a PO sends it to Tally on its own**; the Purchase screen shows
+IN TALLY ✓, or NOT SENT TO TALLY with the reason and a **Retry** button (`push` does the same from the command line).
+It sends only an approved PO whose number Tally doesn't have yet, whose vendor is a Tally ledger, whose items are
+Tally stock items and whose lines all have a rate, in the shape of the company's own POs (vendor ledger, items,
+godown Main Location, Purchase-Gst; no GST lines yet), then reads it back. Once vendors are synced from Tally,
+indents and POs can only use Tally vendors.
+
+One sync reads three things, nothing else:
+- **stock items** → the app's items: the PMS/PMR alias is the code, else `T` + Tally's MasterID; name and unit
+  as in Tally. Only items bought on a PO or carrying a PMS/PMR code become app items; a rename in Tally keeps
+  the code (matched by MasterID).
+- **vendors** (ledgers under Sundry Creditors) → approved suppliers.
+- **Purchase Orders** → the PO copy the gate searches (expense POs without stock items are left out; a PO
+  that cannot be read exactly — e.g. a number used twice — is skipped and listed on the Purchase screen).
+
+Settings in `.env`: `TALLY_URL` (default `http://localhost:9000`), `TALLY_COMPANY` (empty = the company open
+in Tally), `TALLY_PO_VOUCHER_TYPES`. Tally must be open with the company loaded and its server on
+(F1 → Settings → Connectivity → Client/Server configuration, port 9000); block the port from the network
+(`New-NetFirewallRule … -LocalPort 9000 -Action Block`) — it has no login. To keep MySQL up to date, run
+`npm run tally -- sync` every 10 minutes from Windows Task Scheduler (start in this folder).
+
+**PO open / closed:** a PO is open until every item has arrived (Store's GRN count once it exists, else the gate
+qty). Tally cannot tell which older POs were received (most purchase invoices don't name their PO), so a PO can
+be **closed in MySQL**: by Purchase (with a reason) on the Purchase screen, reopened the same way, and once at
+go-live by the owner — *Close old POs* closes every PO dated before a date that has nothing received in the app.
+
 ## Security model
 
 | Concern | How it is handled |
@@ -84,12 +126,21 @@ npm run master -- rename-customer "Meera Cosmetics" "Meera Cosmetics LLP"
 Undo a reset (server command line): `npm run snapshot -- list`, then `npm run snapshot -- restore <id>`
 (the data being replaced is itself snapshotted first, so a restore can be undone too).
 
-Security tests (development database with demo data and dev passwords only):
+**Tests: `npm test`** runs every suite below on its own database (`<DB_NAME>_test`, recreated each
+run) and its own API on port 4001 — the working database is never touched. `node server/test/flow.mjs`
+is the inward flow end to end (Tally PO → gate → GRN with shortage → QC approved into PM stock,
+rejected into the rejected count → PO closes when everything has arrived). Each suite can also be run
+alone against a development server with demo data:
 `npm run test:api`, `node server/test/concurrency.mjs`, `node server/test/reset.mjs`,
 `node server/test/integrity.mjs` (renames stay consistent; MySQL rejects broken references,
 impossible values and gate-out without invoice; failed transactions leave nothing behind),
 `node server/test/parallel.mjs` (stale-screen refusal, parallel saves, gap-free numbers,
-change-only sync). Run `concurrency.mjs` last — it locks a login and changes a password on purpose.
+change-only sync). `node server/test/gate.mjs` (Tally PO import, item-wise gate in, partial delivery keeps the PO
+open, supplier/code/unit from the PO, real dates, no duplicate invoice, vehicle out recorded once). `node server/test/grn.mjs` (one GRN per gate-checked item in the PO's unit, never more than
+came in, Store's count is what the PO has received, a picked PMS code is remembered).
+`node server/test/tallysync.mjs` (the sync against a fake Tally: codes, units, vendors, changes only, rename
+keeps the code, edited/deleted POs, duplicate numbers; creating a PO in Tally and its guards; PO close / reopen /
+go-live cut-over). Run `concurrency.mjs` last — it locks a login and changes a password on purpose.
 
 ## The flow it implements
 

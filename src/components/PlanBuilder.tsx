@@ -183,7 +183,7 @@ function QtyField({
 
   return (
     <input
-      className="num h-8 w-[112px] rounded-[3px] border border-rule px-2 text-right text-[14.5px] font-bold hover:border-[#b9cbe0]"
+      className="num h-8 w-[112px] rounded-[3px] border border-rule px-2 text-right text-[14.5px] font-bold hover:border-[#9e9e9e]"
       type="text"
       inputMode="numeric"
       aria-label={label}

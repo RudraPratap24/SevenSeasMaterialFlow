@@ -6,6 +6,8 @@ export default defineConfig({
   base: "/",
   server: {
     port: 5173,
+    // Logins are only accepted from APP_ORIGIN (localhost:5173): fail loudly instead of moving to 5174.
+    strictPort: true,
     open: false,
     // Dev: the browser talks to Vite only; /api is forwarded to the Express server,
     // so cookies stay same-origin exactly as in production.

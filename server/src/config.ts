@@ -36,6 +36,22 @@ const schema = z.object({
   LOGIN_MAX_FAILURES: z.coerce.number().int().min(3).max(20).default(5),
   LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(15),
 
+  /** TallyPrime's HTTP port (read only), for "npm run tally -- fetch". */
+  TALLY_URL: z.string().url().default("http://localhost:9000"),
+  /** The company to read in Tally; empty = the company open in Tally. */
+  TALLY_COMPANY: z.string().default(""),
+  /** Lets `npm run tally -- push` create POs in Tally. Off unless set — a test copy of Tally only, until Accounts agrees. */
+  TALLY_ALLOW_WRITE: bool.default(false),
+  /** Test copies only: TallyPrime's Educational mode takes vouchers dated the 1st or 2nd — e.g. 20261001. */
+  TALLY_TEST_DATE: z.string().regex(/^(\d{8})?$/, "must be yyyymmdd").default(""),
+  /** How often `npm run tally -- watch` syncs, in seconds. */
+  TALLY_SYNC_SECONDS: z.coerce.number().int().min(10).max(3600).default(30),
+  /** Names of the client's Purchase Order voucher types in Tally (comma-separated). */
+  TALLY_PO_VOUCHER_TYPES: z
+    .string()
+    .default("Purchase Order")
+    .transform((v) => v.split(",").map((t) => t.trim()).filter(Boolean)),
+
   /** Admin-only "Load demo data" / "Clear all" — keep false on the live system. */
   ALLOW_DEMO_RESET: bool.default(false),
 });

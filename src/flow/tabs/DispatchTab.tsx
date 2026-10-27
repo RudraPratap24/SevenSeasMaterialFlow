@@ -3,7 +3,7 @@ import { api, ApiError } from "../api";
 import { CUSTOMER_ROLES } from "../perms";
 import { useAuth } from "../auth";
 import { todayLabel, useFlow } from "../store";
-import { Card, Chip, EmptyNote, Field, Table, Td, TextInput, Tr, fmt } from "../ui";
+import { Card, Chip, DateInput, EmptyNote, Field, Table, Td, TextInput, Tr, fmt } from "../ui";
 
 export function DispatchTab() {
   return (
@@ -31,7 +31,7 @@ function OrdersCard() {
     const [custPoNo, setCustPoNo] = useState("");
     const [productName, setProductName] = useState("");
     const [qty, setQty] = useState("");
-    const [deliveryDate, setDeliveryDate] = useState("");
+    const [deliveryDate, setDeliveryDate] = useState(todayLabel);
 
     function fillDemo() {
       setPartyName("Meera Cosmetics");
@@ -39,7 +39,7 @@ function OrdersCard() {
       setCustPoNo(`MC/${120 + state.orders.length}`);
       setProductName(fgStock.find((r) => r.inStock > 0)?.productName ?? PRODUCTS[0].name);
       setQty("600");
-      setDeliveryDate("");
+      setDeliveryDate(todayLabel());
       setOpen(true);
     }
 
@@ -113,7 +113,7 @@ function OrdersCard() {
                 <TextInput value={qty} onChange={setQty} numeric placeholder="600" />
               </Field>
               <Field label="Delivery date">
-                <TextInput value={deliveryDate} onChange={setDeliveryDate} placeholder="dd-mm-yyyy" />
+                <DateInput value={deliveryDate} onChange={setDeliveryDate} />
               </Field>
             </div>
             <button

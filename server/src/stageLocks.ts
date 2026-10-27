@@ -22,11 +22,20 @@ interface Rule {
   extra?: string;
   /** Columns handled by `extra` instead of the generic lock. */
   special?: string[];
+  /** Key columns that may change only while the session says so (@flow_renumber = 1, set by renumberPo). */
+  renumber?: string[];
 }
 
 /** Every register table. Tables without a rule are fully immutable once written. */
 const RULES: Record<string, Rule> = {
-  gate_entries: {},
+  gate_entries: {
+    setOnce: ["time_out"],
+    special: ["driver_signed"],
+    extra: `IF OLD.driver_signed = 1 AND NEW.driver_signed = 0 THEN
+              SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Driver sign is already recorded and cannot be removed';
+            END IF;`,
+  },
+  gate_entry_lines: {},
   goods_receipts: {
     until: {
       cols: ["total_qty", "location_id", "remark_store"],
@@ -62,7 +71,13 @@ const RULES: Record<string, Rule> = {
     until: { cols: ["security_sign"], cond: "OLD.gate_out_at IS NULL", why: "Dispatch has left the gate and is locked" },
   },
   dispatch_lines: {},
-  purchase_orders: { setOnce: ["approved_by", "approved_at"] },
+  // The Tally send result is bookkeeping: retried until Tally takes the PO.
+  // A PO whose number Tally already used gets a new one (its lines and indents follow by ON UPDATE CASCADE).
+  purchase_orders: {
+    setOnce: ["approved_by", "approved_at"],
+    special: ["tally_push_at", "tally_push_error"],
+    renumber: ["po_no"],
+  },
   purchase_order_lines: {},
   purchase_indents: { setOnce: ["po_no"] },
 };
@@ -82,7 +97,7 @@ export async function installStageLocks(conn: Connection): Promise<void> {
   for (const [table, rule] of Object.entries(RULES)) {
     const cols = await columnsOf(conn, table);
     if (cols.length === 0) continue;
-    const managed = new Set([...(rule.setOnce ?? []), ...(rule.until?.cols ?? []), ...(rule.special ?? [])]);
+    const managed = new Set([...(rule.setOnce ?? []), ...(rule.until?.cols ?? []), ...(rule.special ?? []), ...(rule.renumber ?? [])]);
     const locked = cols.filter((c) => !FREE.has(c) && !managed.has(c));
 
     const body: string[] = [];
@@ -92,6 +107,9 @@ export async function installStageLocks(conn: Connection): Promise<void> {
     }
     if (rule.until) body.push(`IF NOT (${rule.until.cond}) AND NOT (${same(rule.until.cols)}) THEN ${signal(rule.until.why)} END IF;`);
     if (rule.extra) body.push(rule.extra);
+    for (const c of rule.renumber ?? []) {
+      body.push(`IF NOT (OLD.\`${c}\` <=> NEW.\`${c}\`) AND COALESCE(@flow_renumber, 0) <> 1 THEN ${signal(`${table}.${c} cannot change`)} END IF;`);
+    }
 
     await conn.query(`DROP TRIGGER IF EXISTS trg_${table}_stage_lock`);
     await conn.query(`CREATE TRIGGER trg_${table}_stage_lock BEFORE UPDATE ON ${table} FOR EACH ROW BEGIN ${body.join(" ")} END`);

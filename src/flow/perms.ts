@@ -83,6 +83,9 @@ export type Action =
   | "purchase.indent"
   | "purchase.po"
   | "purchase.approve"
+  | "purchase.close"
+  | "purchase.cutover"
+  | "purchase.tally"
   | "customer.edit"
   | "demo.data";
 
@@ -107,6 +110,11 @@ export const PERMS: Record<Action, Role[]> = {
   "purchase.po": ["purchase", "admin"],
   // Client: "management approves the PO" — the owner's button alone.
   "purchase.approve": ["admin"],
+  // A PO can be closed/reopened by Purchase; the one-time go-live cut-over only by the owner.
+  "purchase.close": ["purchase", "admin"],
+  "purchase.cutover": ["admin"],
+  // Send an approved PO to Tally again after Tally refused it (it goes on its own at approval).
+  "purchase.tally": ["purchase", "admin"],
   // Customer master: name/address corrections apply to every order and dispatch.
   "customer.edit": ["accounts", "admin"],
   "demo.data": ["admin"],
@@ -125,7 +133,7 @@ export function roleCan(role: Role, action: Action): boolean {
 export type Collection = keyof FlowState;
 
 export const READ_SCOPES: Record<Role, Collection[]> = {
-  gate: ["gateEntries", "purchaseOrders", "grnLines"],
+  gate: ["gateEntries", "tallyPos", "purchaseOrders", "poClosures", "grnLines"],
   store: ["openings", "minLevels", "gateEntries", "grnLines", "qcIntimations", "requisitions", "mrns"],
   qc: ["gateEntries", "grnLines", "qcIntimations", "arRecords", "fgTransfers", "pdiRecords", "dispatchSlips"],
   packing: [
@@ -142,7 +150,7 @@ export const READ_SCOPES: Record<Role, Collection[]> = {
   ],
   fgwh: ["requisitions", "fgTransfers", "pdiRecords", "orders", "dispatchSlips"],
   accounts: ["fgTransfers", "pdiRecords", "orders", "dispatchSlips"],
-  purchase: ["openings", "minLevels", "grnLines", "requisitions", "mrns", "indents", "purchaseOrders"],
+  purchase: ["openings", "minLevels", "gateEntries", "grnLines", "requisitions", "mrns", "indents", "purchaseOrders", "tallyPos", "poClosures"],
   security: ["gateEntries", "purchaseOrders", "grnLines", "fgTransfers", "pdiRecords", "orders", "dispatchSlips"],
   admin: [
     "openings",
@@ -159,6 +167,8 @@ export const READ_SCOPES: Record<Role, Collection[]> = {
     "dispatchSlips",
     "indents",
     "purchaseOrders",
+    "tallyPos",
+    "poClosures",
   ],
 };
 

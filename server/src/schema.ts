@@ -1,4 +1,4 @@
-import type { Connection } from "mysql2/promise";
+import type { Connection, RowDataPacket } from "mysql2/promise";
 import { addVersioning, convertLegacyData, dropLegacyTables } from "./legacy";
 import { installStageLocks } from "./stageLocks";
 
@@ -165,13 +165,242 @@ const SEQ = "seq BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, UNIQUE KEY uq_seq (seq
 /** Month-year as printed on labels (mm-yyyy), a full date (dd-mm-yyyy), or empty. */
 const LABEL_DATE = (col: string) => `CHECK (${col} REGEXP '^(([0-9]{2}-)?[0-9]{2}-[0-9]{4})?$')`;
 
+/**
+ * Purchase Orders as they stand in Tally — a read-only copy, replaced on every import.
+ * Tally is never written to; what has come in against a PO is tracked by the gate entry lines.
+ */
+const TALLY_PO_TABLES = [
+  `CREATE TABLE IF NOT EXISTS tally_purchase_orders (
+    po_no         VARCHAR(40)  NOT NULL PRIMARY KEY,
+    ${SEQ},
+    po_date       DATE         NOT NULL,
+    supplier_name VARCHAR(160) NOT NULL,
+    cancelled     TINYINT(1)   NOT NULL DEFAULT 0,
+    synced_at     DATETIME     NOT NULL,
+    guid          VARCHAR(80)  NOT NULL DEFAULT '' COMMENT 'Tally voucher GUID',
+    alter_id      BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Tally change number of the copy',
+    row_version   BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'state version of the last change',
+    ${AUDIT_COLS},
+    KEY ix_row_version (row_version),
+    KEY ix_supplier (supplier_name)
+  ) ${T}`,
+  `CREATE TABLE IF NOT EXISTS tally_po_lines (
+    po_no     VARCHAR(40)   NOT NULL,
+    line_no   INT UNSIGNED  NOT NULL,
+    item_name VARCHAR(160)  NOT NULL,
+    item_code VARCHAR(16)   NOT NULL DEFAULT '' COMMENT 'PMS code when the item is in the component master',
+    qty       DECIMAL(14,3) NOT NULL,
+    unit      VARCHAR(16)   NOT NULL,
+    PRIMARY KEY (po_no, line_no),
+    FOREIGN KEY (po_no) REFERENCES tally_purchase_orders (po_no),
+    CHECK (qty > 0)
+  ) ${T}`,
+];
+
+/**
+ * The librarian's copy of Tally's whole stock item list (masters only): lets a PO line be coded even when its
+ * item did not change in this sync. Items we buy or code become `components`.
+ */
+const TALLY_ITEMS = `CREATE TABLE IF NOT EXISTS tally_items (
+    name      VARCHAR(200)    NOT NULL PRIMARY KEY,
+    alias     VARCHAR(80)     NOT NULL DEFAULT '',
+    unit      VARCHAR(16)     NOT NULL DEFAULT '',
+    grp       VARCHAR(120)    NOT NULL DEFAULT '',
+    master_id BIGINT UNSIGNED NOT NULL,
+    alter_id  BIGINT UNSIGNED NOT NULL,
+    synced_at DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+  ) ${T}`;
+
+/**
+ * A PO marked closed in MySQL (by hand or the go-live cut-over) — keyed by PO number so it survives every Tally
+ * re-sync and covers app POs too. Reopening sets closed = 0; rows are never deleted.
+ */
+const PO_CLOSURES = `CREATE TABLE IF NOT EXISTS po_closures (
+    po_no       VARCHAR(40)  NOT NULL PRIMARY KEY,
+    ${SEQ},
+    closed      TINYINT(1)   NOT NULL,
+    closed_on   DATE         NOT NULL,
+    closed_by   VARCHAR(80)  NOT NULL,
+    reason      VARCHAR(200) NOT NULL,
+    row_version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'state version of the last change',
+    ${AUDIT_COLS},
+    KEY ix_row_version (row_version)
+  ) ${T}`;
+
+/** What the guard checked in, item by item, against a Tally PO. Write-once (stage lock). */
+const GATE_ENTRY_LINES = `CREATE TABLE IF NOT EXISTS gate_entry_lines (
+    gate_entry_no VARCHAR(20)   NOT NULL,
+    line_no       INT UNSIGNED  NOT NULL,
+    item_name     VARCHAR(160)  NOT NULL,
+    item_code     VARCHAR(16)   NOT NULL DEFAULT '',
+    unit          VARCHAR(16)   NOT NULL,
+    qty           DECIMAL(14,3) NOT NULL,
+    remark        VARCHAR(300)  NOT NULL DEFAULT '',
+    PRIMARY KEY (gate_entry_no, line_no),
+    FOREIGN KEY (gate_entry_no) REFERENCES gate_entries (gate_entry_no),
+    CHECK (qty > 0)
+  ) ${T}`;
+
+/** Migration 7 on an existing database (a fresh one already has all of it from migration 3). */
+async function addTallyPurchaseOrders(conn: Connection): Promise<void> {
+  for (const sql of TALLY_PO_TABLES) await conn.query(sql);
+  const [col] = await conn.query<RowDataPacket[]>(
+    "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gate_entries' AND COLUMN_NAME = 'tally_po_no'",
+  );
+  if (col.length === 0) {
+    await conn.query(`ALTER TABLE gate_entries
+      ADD COLUMN tally_po_no VARCHAR(40) NULL COMMENT 'PO made in Tally (gate in against it)' AFTER external_po_ref,
+      ADD FOREIGN KEY (tally_po_no) REFERENCES tally_purchase_orders (po_no),
+      ADD CHECK ((po_no IS NOT NULL) + (external_po_ref IS NOT NULL) + (tally_po_no IS NOT NULL) <= 1)`);
+  }
+  await conn.query(GATE_ENTRY_LINES);
+}
+
+/** Migration 8 on an existing database: a GRN counts one gate-checked item, in the PO's unit. */
+async function grnAgainstGateLines(conn: Connection): Promise<void> {
+  const [col] = await conn.query<RowDataPacket[]>(
+    "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'goods_receipts' AND COLUMN_NAME = 'gate_line_no'",
+  );
+  if (col.length > 0) return; // fresh install: created this way in migration 3
+  await conn.query(`ALTER TABLE goods_receipts
+    ADD COLUMN gate_line_no INT UNSIGNED NULL COMMENT 'the gate-checked PO item this GRN counts (NULL: arrival without PO)' AFTER gate_entry_no,
+    MODIFY total_qty DECIMAL(14,3) NOT NULL,
+    MODIFY po_qty DECIMAL(14,3) NULL,
+    ADD COLUMN unit VARCHAR(16) NOT NULL DEFAULT '' COMMENT 'the PO unit; empty = pcs (before Tally POs)' AFTER total_qty,
+    ADD UNIQUE KEY uq_gate_line (gate_entry_no, gate_line_no),
+    ADD FOREIGN KEY (gate_entry_no, gate_line_no) REFERENCES gate_entry_lines (gate_entry_no, line_no)`);
+}
+
+/** Migration 9 on an existing database: an indent names its vendor, so one PO can gather a vendor's indents. */
+async function indentVendor(conn: Connection): Promise<void> {
+  const [col] = await conn.query<RowDataPacket[]>(
+    "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_indents' AND COLUMN_NAME = 'supplier_id'",
+  );
+  // PO numbers raised here continue after those already copied from Tally (same 26SEV… series).
+  await conn.query(
+    `UPDATE document_sequences SET last_no = GREATEST(last_no, COALESCE((
+       SELECT MAX(CAST(SUBSTRING(po_no, 6) AS UNSIGNED)) FROM tally_purchase_orders WHERE po_no REGEXP '^26SEV[0-9]+$'), 0))
+     WHERE series = 'PO'`,
+  );
+  if (col.length > 0) return; // fresh install: created this way in migration 3
+  await conn.query(`ALTER TABLE purchase_indents
+    ADD COLUMN supplier_id INT UNSIGNED NULL COMMENT 'the vendor this indent is to be bought from' AFTER reason,
+    ADD FOREIGN KEY (supplier_id) REFERENCES suppliers (id)`);
+}
+
+const columnMissing = async (conn: Connection, table: string, column: string) => {
+  const [r] = await conn.query<RowDataPacket[]>(
+    "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+    [table, column],
+  );
+  return r.length === 0;
+};
+
+/** Migration 10 on an existing database: the app's item master and PO status follow the real Tally data. */
+async function tallyMasters(conn: Connection): Promise<void> {
+  await conn.query(TALLY_ITEMS);
+  await conn.query(PO_CLOSURES);
+  if (await columnMissing(conn, "components", "unit")) {
+    await conn.query(`ALTER TABLE components
+      ADD COLUMN unit VARCHAR(16) NOT NULL DEFAULT '' COMMENT 'Tally base unit; empty = pcs' AFTER type,
+      ADD COLUMN tally_name VARCHAR(200) NULL COMMENT 'the stock item it is in Tally' AFTER unit,
+      ADD UNIQUE KEY uq_tally_name (tally_name)`);
+  }
+  if (await columnMissing(conn, "tally_purchase_orders", "guid")) {
+    await conn.query(`ALTER TABLE tally_purchase_orders
+      ADD COLUMN guid VARCHAR(80) NOT NULL DEFAULT '' COMMENT 'Tally voucher GUID' AFTER synced_at,
+      ADD COLUMN alter_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Tally change number of the copy' AFTER guid`);
+  }
+  // Sync status (last run, POs left out and why) is longer than a counter.
+  await conn.query("ALTER TABLE app_meta MODIFY v TEXT NOT NULL");
+}
+
+/** Migration 11 on an existing database: an indent carries its expected rate, so every PO has a total. */
+async function indentRate(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "purchase_indents", "rate_enc")) {
+    await conn.query(
+      "ALTER TABLE purchase_indents ADD COLUMN rate_enc VARCHAR(255) NULL COMMENT 'encrypted expected rate per unit (carried onto the PO line)' AFTER supplier_id",
+    );
+  }
+}
+
+/** Migration 12 on an existing database: excess beyond the tolerance waits for Purchase. */
+async function gateExcess(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "gate_entry_lines", "excess_qty")) {
+    await conn.query(`ALTER TABLE gate_entry_lines
+      ADD COLUMN excess_qty DECIMAL(14,3) NULL COMMENT 'arrived beyond ordered + tolerance' AFTER remark,
+      ADD COLUMN excess_status ENUM('PENDING','APPROVED','REJECTED') NULL AFTER excess_qty,
+      ADD COLUMN excess_decided_by VARCHAR(80) NULL AFTER excess_status,
+      ADD COLUMN excess_decided_on DATE NULL AFTER excess_decided_by`);
+  }
+}
+
+/** Migration 13: the client chose no tolerance (never accept more than pending) — migration 12's columns go. */
+async function dropGateExcess(conn: Connection): Promise<void> {
+  if (!(await columnMissing(conn, "gate_entry_lines", "excess_qty"))) {
+    await conn.query(`ALTER TABLE gate_entry_lines
+      DROP COLUMN excess_qty, DROP COLUMN excess_status, DROP COLUMN excess_decided_by, DROP COLUMN excess_decided_on`);
+  }
+}
+
+/** Migration 14: approved POs go to Tally on their own (result kept on the PO); vendors known as Tally ledgers. */
+async function poToTally(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "purchase_orders", "tally_push_at")) {
+    await conn.query(`ALTER TABLE purchase_orders
+      ADD COLUMN tally_push_at DATETIME NULL COMMENT 'last attempt to create it in Tally' AFTER approved_at,
+      ADD COLUMN tally_push_error VARCHAR(500) NULL COMMENT 'why Tally did not take it (empty = created)' AFTER tally_push_at`);
+  }
+  if (await columnMissing(conn, "suppliers", "from_tally")) {
+    await conn.query("ALTER TABLE suppliers ADD COLUMN from_tally TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'a ledger in Tally (synced)' AFTER approved");
+  }
+}
+
+/** Migration 15: an app PO whose number Tally already used is sent under a new number (kept here). */
+async function poTallyNumber(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "purchase_orders", "tally_po_no")) {
+    await conn.query(`ALTER TABLE purchase_orders
+      ADD COLUMN tally_po_no VARCHAR(40) NULL UNIQUE COMMENT 'number used in Tally when its own was taken there (NULL = po_no)' AFTER tally_push_error`);
+  }
+}
+
+/**
+ * Migration 16: one number per PO. A PO whose number Tally already used gets a new number of its own (its lines and
+ * indents follow: ON UPDATE CASCADE; it is renumbered only before any gate entry, so gate entries never need to);
+ * POs given a separate Tally number by migration 15 take that number.
+ */
+async function onePoNumber(conn: Connection): Promise<void> {
+  const [fks] = await conn.query<RowDataPacket[]>(
+    `SELECT k.TABLE_NAME AS t, k.CONSTRAINT_NAME AS name FROM information_schema.KEY_COLUMN_USAGE k
+       JOIN information_schema.REFERENTIAL_CONSTRAINTS r ON r.CONSTRAINT_SCHEMA = k.TABLE_SCHEMA AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
+      WHERE k.TABLE_SCHEMA = DATABASE() AND k.REFERENCED_TABLE_NAME = 'purchase_orders' AND r.UPDATE_RULE <> 'CASCADE'
+        AND k.TABLE_NAME IN ('purchase_order_lines', 'purchase_indents')`,
+  );
+  for (const fk of fks) {
+    await conn.query(`ALTER TABLE ${fk.t} DROP FOREIGN KEY ${fk.name}`);
+    await conn.query(`ALTER TABLE ${fk.t} ADD CONSTRAINT ${fk.name} FOREIGN KEY (po_no) REFERENCES purchase_orders (po_no) ON UPDATE CASCADE`);
+  }
+  if (await columnMissing(conn, "purchase_orders", "tally_po_no")) return;
+  // the stage lock forbids a new number; db:setup installs it again right after the migrations
+  await conn.query("DROP TRIGGER IF EXISTS trg_purchase_orders_stage_lock");
+  const [moved] = await conn.query<RowDataPacket[]>("SELECT po_no, tally_po_no FROM purchase_orders WHERE tally_po_no IS NOT NULL");
+  for (const m of moved) {
+    await conn.query("UPDATE purchase_orders SET po_no = ?, tally_po_no = NULL WHERE po_no = ?", [m.tally_po_no, m.po_no]);
+    await conn.query("UPDATE po_closures SET po_no = ? WHERE po_no = ?", [m.tally_po_no, m.po_no]);
+  }
+  await conn.query("ALTER TABLE purchase_orders DROP COLUMN tally_po_no");
+  if (moved.length) await conn.query("UPDATE app_meta SET v = CAST(v AS UNSIGNED) + 1 WHERE k IN ('state_version', 'resync_version')");
+}
+
 export const RELATIONAL_TABLES: string[] = [
   /* masters */
   `CREATE TABLE IF NOT EXISTS components (
     code   VARCHAR(16)  NOT NULL PRIMARY KEY,
     name   VARCHAR(160) NOT NULL,
     type   VARCHAR(40)  NOT NULL DEFAULT '',
+    unit   VARCHAR(16)  NOT NULL DEFAULT '' COMMENT 'Tally base unit; empty = pcs',
+    tally_name VARCHAR(200) NULL COMMENT 'the stock item it is in Tally',
     active TINYINT(1)   NOT NULL DEFAULT 1,
+    UNIQUE KEY uq_tally_name (tally_name),
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
   ) ${T}`,
@@ -246,6 +475,8 @@ export const RELATIONAL_TABLES: string[] = [
     expected_date DATE         NULL,
     approved_by   INT UNSIGNED NULL COMMENT 'set = APPROVED',
     approved_at   DATETIME(3)  NULL,
+    tally_push_at    DATETIME     NULL COMMENT 'last attempt to create it in Tally',
+    tally_push_error VARCHAR(500) NULL COMMENT 'why Tally did not take it (empty = created)',
     ${AUDIT_COLS},
     FOREIGN KEY (supplier_id) REFERENCES suppliers (id),
     FOREIGN KEY (approved_by) REFERENCES users (id),
@@ -258,7 +489,7 @@ export const RELATIONAL_TABLES: string[] = [
     qty            INT               NOT NULL,
     rate_enc       VARCHAR(255)      NULL COMMENT 'encrypted rate agreed on this PO',
     PRIMARY KEY (po_no, line_no),
-    FOREIGN KEY (po_no) REFERENCES purchase_orders (po_no),
+    FOREIGN KEY (po_no) REFERENCES purchase_orders (po_no) ON UPDATE CASCADE,
     FOREIGN KEY (component_code) REFERENCES components (code),
     CHECK (qty > 0)
   ) ${T}`,
@@ -269,14 +500,18 @@ export const RELATIONAL_TABLES: string[] = [
     component_code VARCHAR(16)  NOT NULL,
     qty            INT          NOT NULL,
     reason         VARCHAR(200) NOT NULL DEFAULT '',
+    supplier_id    INT UNSIGNED NULL COMMENT 'the vendor this indent is to be bought from',
+    rate_enc       VARCHAR(255) NULL COMMENT 'encrypted expected rate per unit (carried onto the PO line)',
     po_no          VARCHAR(20)  NULL COMMENT 'set = PO_RAISED',
     ${AUDIT_COLS},
     FOREIGN KEY (component_code) REFERENCES components (code),
-    FOREIGN KEY (po_no) REFERENCES purchase_orders (po_no),
+    FOREIGN KEY (supplier_id) REFERENCES suppliers (id),
+    FOREIGN KEY (po_no) REFERENCES purchase_orders (po_no) ON UPDATE CASCADE,
     CHECK (qty > 0)
   ) ${T}`,
 
   /* inward + QC */
+  ...TALLY_PO_TABLES,
   `CREATE TABLE IF NOT EXISTS gate_entries (
     gate_entry_no   VARCHAR(20)  NOT NULL PRIMARY KEY,
     ${SEQ},
@@ -288,6 +523,7 @@ export const RELATIONAL_TABLES: string[] = [
     invoice_qty     INT          NULL,
     po_no           VARCHAR(20)  NULL,
     external_po_ref VARCHAR(40)  NULL COMMENT 'PO numbers from before the system / on paper',
+    tally_po_no     VARCHAR(40)  NULL COMMENT 'PO made in Tally (gate in against it)',
     transport_name  VARCHAR(120) NOT NULL DEFAULT '',
     lr_no_enc       VARCHAR(255) NULL,
     vehicle_no_enc  VARCHAR(255) NULL,
@@ -299,26 +535,35 @@ export const RELATIONAL_TABLES: string[] = [
     KEY ix_date (entry_date),
     FOREIGN KEY (supplier_id) REFERENCES suppliers (id),
     FOREIGN KEY (po_no) REFERENCES purchase_orders (po_no),
+    FOREIGN KEY (tally_po_no) REFERENCES tally_purchase_orders (po_no),
     CHECK (invoice_qty IS NULL OR invoice_qty >= 0),
-    CHECK (po_no IS NULL OR external_po_ref IS NULL)
+    CHECK (po_no IS NULL OR external_po_ref IS NULL),
+    CHECK ((po_no IS NOT NULL) + (external_po_ref IS NOT NULL) + (tally_po_no IS NOT NULL) <= 1)
   ) ${T}`,
+  GATE_ENTRY_LINES,
+  TALLY_ITEMS,
+  PO_CLOSURES,
   `CREATE TABLE IF NOT EXISTS goods_receipts (
     grn_no         VARCHAR(20)  NOT NULL PRIMARY KEY,
     ${SEQ},
     gate_entry_no  VARCHAR(20)  NOT NULL COMMENT 'supplier, invoice and PO come from here',
+    gate_line_no   INT UNSIGNED NULL COMMENT 'the gate-checked PO item this GRN counts (NULL: arrival without PO)',
     component_code VARCHAR(16)  NOT NULL,
     brand_name     VARCHAR(60)  NOT NULL DEFAULT '',
     received_date  DATE         NOT NULL,
-    po_qty         INT          NULL,
+    po_qty         DECIMAL(14,3) NULL,
     qty_per_box    INT          NULL,
     total_boxes    INT          NULL,
-    total_qty      INT          NOT NULL,
+    total_qty      DECIMAL(14,3) NOT NULL,
+    unit           VARCHAR(16)  NOT NULL DEFAULT '' COMMENT 'the PO unit; empty = pcs (before Tally POs)',
     location_id    INT UNSIGNED NULL,
     barcoded       TINYINT(1)   NOT NULL DEFAULT 0,
     remark_store   VARCHAR(500) NOT NULL DEFAULT '',
     ${AUDIT_COLS},
     KEY ix_date (received_date),
+    UNIQUE KEY uq_gate_line (gate_entry_no, gate_line_no),
     FOREIGN KEY (gate_entry_no) REFERENCES gate_entries (gate_entry_no),
+    FOREIGN KEY (gate_entry_no, gate_line_no) REFERENCES gate_entry_lines (gate_entry_no, line_no),
     FOREIGN KEY (component_code) REFERENCES components (code),
     FOREIGN KEY (location_id) REFERENCES locations (id),
     CHECK (total_qty >= 0),
@@ -542,6 +787,66 @@ MIGRATIONS.push(
     statements: [],
     run: installStageLocks,
   },
+  {
+    version: 7,
+    name: "Tally purchase orders (read-only copy) + gate entry lines",
+    statements: [],
+    run: addTallyPurchaseOrders,
+  },
+  {
+    version: 8,
+    name: "GRN per gate-checked item, in the PO's unit",
+    statements: [],
+    run: grnAgainstGateLines,
+  },
+  {
+    version: 9,
+    name: "indents name their vendor (one PO for several indents)",
+    statements: [],
+    run: indentVendor,
+  },
+  {
+    version: 10,
+    name: "item master, vendors and PO status from the real Tally data",
+    statements: [],
+    run: tallyMasters,
+  },
+  {
+    version: 11,
+    name: "indents carry the expected rate (PO totals)",
+    statements: [],
+    run: indentRate,
+  },
+  {
+    version: 12,
+    name: "excess beyond the tolerance at the gate waits for Purchase",
+    statements: [],
+    run: gateExcess,
+  },
+  {
+    version: 13,
+    name: "no tolerance at the gate after all: excess columns removed",
+    statements: [],
+    run: dropGateExcess,
+  },
+  {
+    version: 14,
+    name: "approved POs go to Tally automatically; vendors known as Tally ledgers",
+    statements: [],
+    run: poToTally,
+  },
+  {
+    version: 15,
+    name: "an app PO can be sent to Tally under a new number when its own is taken there",
+    statements: [],
+    run: poTallyNumber,
+  },
+  {
+    version: 16,
+    name: "one number per PO: a PO renumbered for Tally keeps one number everywhere",
+    statements: [],
+    run: onePoNumber,
+  },
 );
 
 /* ── privileges of the runtime app account ──────────────────────────────────── */
@@ -551,6 +856,10 @@ export const BUSINESS_TABLES = [
   "purchase_order_lines",
   "purchase_indents",
   "gate_entries",
+  "gate_entry_lines",
+  "po_closures",
+  "tally_purchase_orders",
+  "tally_po_lines",
   "goods_receipts",
   "qc_intimations",
   "qc_results",

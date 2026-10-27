@@ -241,7 +241,7 @@ const StockRow = memo(function StockRow({
     <div
       role="row"
       className="grid items-center gap-2 border-b border-rule px-3"
-      style={{ background: zebra ? "#FBFCFD" : "var(--card)", gridTemplateColumns: COLS }}
+      style={{ background: zebra ? "#FAFAFA" : "var(--card)", gridTemplateColumns: COLS }}
     >
       <div role="cell" className="num py-2 text-[12px] text-muted">
         {row.code}

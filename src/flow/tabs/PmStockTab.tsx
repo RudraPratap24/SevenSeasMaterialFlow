@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useFlow } from "../store";
-import { Card, Chip, EmptyNote, Table, Td, Tr, fmt } from "../ui";
+import { Card, Chip, EmptyNote, Table, Td, Tr, fmt, fmtQty } from "../ui";
 
 export function PmStockTab() {
   const { pmStock } = useFlow();
@@ -67,13 +67,16 @@ export function PmStockTab() {
             { label: "Rejected", align: "right" },
           ]}
         >
-          {rows.map((r, i) => (
+          {rows.map((r, i) => {
+            // Pcs rows as before; a Kg/Doz row shows its unit on every figure.
+            const q = (n: number) => (r.unit ? fmtQty(n, r.unit) : fmt(n));
+            return (
             <Tr key={r.code} zebra={i % 2 === 1}>
               <Td num muted>{r.code}</Td>
               <Td>{r.name}</Td>
               <Td muted>{r.type}</Td>
               <Td right num>{fmt(r.opening)}</Td>
-              <Td right num>{r.received > 0 ? fmt(r.received) : "—"}</Td>
+              <Td right num>{r.received > 0 ? q(r.received) : "—"}</Td>
               <Td right num>{r.issued > 0 ? fmt(r.issued) : "—"}</Td>
               <Td right num>{r.returned > 0 ? fmt(r.returned) : "—"}</Td>
               <Td right num strong>
@@ -85,20 +88,21 @@ export function PmStockTab() {
                   }
                   title={r.minLevel !== null ? `Minimum level ${r.minLevel}` : undefined}
                 >
-                  {fmt(r.closing)}
+                  {q(r.closing)}
                 </span>
               </Td>
               <Td right num>
-                {r.underTest > 0 ? <Chip label={fmt(r.underTest)} tone="blue" /> : "—"}
+                {r.underTest > 0 ? <Chip label={q(r.underTest)} tone="blue" /> : "—"}
               </Td>
               <Td right num>
-                {r.hold > 0 ? <Chip label={fmt(r.hold)} tone="amber" /> : "—"}
+                {r.hold > 0 ? <Chip label={q(r.hold)} tone="amber" /> : "—"}
               </Td>
               <Td right num>
-                {r.rejected > 0 ? <Chip label={fmt(r.rejected)} tone="red" /> : "—"}
+                {r.rejected > 0 ? <Chip label={q(r.rejected)} tone="red" /> : "—"}
               </Td>
             </Tr>
-          ))}
+            );
+          })}
         </Table>
         {rows.length === 0 && (
           <EmptyNote>
@@ -113,7 +117,8 @@ export function PmStockTab() {
         Closing = opening + QC-approved receipts − issues + MRN returns. Amber closing = below
         minimum level (on the purchase short list). Under-test, hold and
         rejected quantities are counted separately and are not usable stock — exactly the SOP's
-        quarantine rule. Component list and codes are your data ({fmt(pmStock.length)} components,
+        quarantine rule. Material received in Kg or Doz has its own row in that unit until
+        the unit conversions are loaded; it cannot be issued as pieces yet. Component list and codes are your data ({fmt(pmStock.length)} components,
         PMS series); opening balances are zero on an empty start and seeded figures with demo
         data loaded.
       </p>

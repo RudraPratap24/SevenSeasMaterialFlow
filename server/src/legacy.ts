@@ -120,7 +120,7 @@ function reconcile(a: FlowState, b: FlowState): void {
       .join(",");
   if (fg(a) !== fg(b)) problems.push("FG stock differs");
   const po = (s: FlowState) =>
-    derivePoProgress(s.purchaseOrders, s.grnLines)
+    derivePoProgress(s.purchaseOrders, s.gateEntries, s.grnLines)
       .map((p) => `${p.po.id}:${p.po.status}:${p.value}:${p.lines.map((l) => l.pending).join("/")}`)
       .join(",");
   if (po(a) !== po(b)) problems.push("PO balances differ");

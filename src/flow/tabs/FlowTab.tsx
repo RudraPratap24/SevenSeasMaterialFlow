@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useFlow, type TabId, type TraceEvent } from "../store";
-import { Card, Chip, RoleTag, fmt } from "../ui";
+import { Card, Chip, Icon, RoleTag, fmt } from "../ui";
 
 interface StepDef {
   n: number;
@@ -248,35 +248,32 @@ export function FlowTab({
 
         <Card title="Today at a glance" role="Live from the registers">
           <div className="grid grid-cols-2 gap-px bg-rule sm:grid-cols-3">
-            {[
-              { label: "GRNs under test", value: counts.underTest, tone: counts.underTest ? "blue" : "muted" },
-              { label: "On hold", value: counts.hold, tone: counts.hold ? "amber" : "muted" },
-              { label: "Rejected", value: counts.rejected, tone: counts.rejected ? "red" : "muted" },
-              { label: "Requisitions pending", value: counts.reqPending, tone: counts.reqPending ? "amber" : "muted" },
-              { label: "FG transfers in transit", value: counts.fgInTransit, tone: counts.fgInTransit ? "amber" : "muted" },
-              { label: "Awaiting gate out", value: counts.dispatchOpen, tone: counts.dispatchOpen ? "amber" : "muted" },
-            ].map((s) => (
-              <div key={s.label} className="bg-card px-3 py-2.5">
-                <p
-                  className="num text-[18px] font-bold"
-                  style={{
-                    color:
-                      s.tone === "red"
-                        ? "var(--red)"
-                        : s.tone === "amber"
-                          ? "var(--amber)"
-                          : s.tone === "blue"
-                            ? "var(--blue-dk)"
-                            : "var(--ink)",
-                  }}
-                >
-                  {fmt(s.value)}
-                </p>
-                <p className="text-[10.5px] font-semibold uppercase tracking-[.05em] text-muted">
-                  {s.label}
-                </p>
-              </div>
-            ))}
+            {(
+              [
+                { label: "GRNs under test", value: counts.underTest, icon: "box", alert: false },
+                { label: "On hold", value: counts.hold, icon: "pause", alert: false },
+                { label: "Rejected", value: counts.rejected, icon: "reject", alert: true },
+                { label: "Requisitions pending", value: counts.reqPending, icon: "doc", alert: false },
+                { label: "FG transfers in transit", value: counts.fgInTransit, icon: "truck", alert: false },
+                { label: "Awaiting gate out", value: counts.dispatchOpen, icon: "exit", alert: false },
+              ] as const
+            ).map((s) => {
+              // only rejections are red; everything else stays black and white
+              const color = s.alert && s.value ? "var(--red)" : "var(--ink)";
+              return (
+                <div key={s.label} className="flex items-start justify-between bg-card px-5 py-5">
+                  <div>
+                    <p className="num text-[24px] font-bold leading-none" style={{ color }}>
+                      {fmt(s.value)}
+                    </p>
+                    <p className="mt-3 text-[11px] font-semibold uppercase tracking-[.06em] text-muted">{s.label}</p>
+                  </div>
+                  <span style={{ color: s.alert && s.value ? "var(--red)" : "var(--muted)" }}>
+                    <Icon name={s.icon} size={22} />
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </Card>
       </div>

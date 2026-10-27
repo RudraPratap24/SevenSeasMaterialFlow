@@ -14,12 +14,16 @@ import type {
   FgTransfer,
   FlowState,
   GateEntry,
+  GateEntryLine,
   GrnLine,
   Indent,
   Mrn,
   PurchaseOrder,
   QcStatus,
+  PoClosure,
   Requisition,
+  TallyPo,
+  TallyPoLine,
 } from "./types";
 
 /** A business-rule rejection. Its message is safe to show to the user. */
@@ -47,6 +51,8 @@ export function emptyState(): FlowState {
     dispatchSlips: [],
     indents: [],
     purchaseOrders: [],
+    tallyPos: [],
+    poClosures: [],
   };
 }
 
@@ -105,6 +111,8 @@ export const DOC_KEYS = {
   dispatchSlips: "id",
   indents: "id",
   purchaseOrders: "id",
+  tallyPos: "poNo",
+  poClosures: "poNo",
 } as const;
 export type DocCollection = keyof typeof DOC_KEYS;
 export const DOC_COLLECTIONS = Object.keys(DOC_KEYS) as DocCollection[];
@@ -153,7 +161,10 @@ export function nowHHMM(): string {
 /* ── derived stock ──────────────────────────────────────────────────────────── */
 
 export interface PmStockRow {
+  /** PMS code; for stock in another unit than pcs, "PMS0003 · Kg" (its own row). */
   code: string;
+  /** "" = pcs (issuable to packing); else the PO unit (Kg, Doz …) of that row. */
+  unit: string;
   name: string;
   type: string;
   opening: number;
@@ -192,12 +203,14 @@ export function derivePmStock(
   components: ComponentInfo[] = [],
 ): Map<string, PmStockRow> {
   const rows = new Map<string, PmStockRow>();
-  const row = (code: string, name = code, type = ""): PmStockRow => {
+  const unitOf = new Map(components.map((c) => [c.code, c.unit]));
+  const row = (code: string, name = code, type = "", unit = unitOf.get(code) ?? ""): PmStockRow => {
     let r = rows.get(code);
     if (!r) {
       const opening = openings[code] ?? 0;
       r = {
         code,
+        unit,
         name,
         type,
         opening,
@@ -217,7 +230,13 @@ export function derivePmStock(
   for (const c of components) row(c.code, c.name, c.type);
   for (const code of Object.keys(openings)) row(code);
   for (const g of grnLines) {
-    const r = row(g.componentCode, g.componentName, g.type);
+    // A receipt in the item's own unit (Kg items in Kg, pcs items in pcs) is its stock.
+    // shortcut: a receipt in ANOTHER unit than the item's gets its own side row — convert once Tally's unit
+    // conversions are loaded.
+    const own = unitOf.get(g.componentCode) ?? "";
+    const r = sameUnit(g.unit, own)
+      ? row(g.componentCode, g.componentName, g.type)
+      : row(`${g.componentCode} · ${g.unit}`, g.componentName, g.type, g.unit);
     if (g.qcStatus === "APPROVED") r.received += g.totalQty;
     else if (g.qcStatus === "UNDER_TEST") r.underTest += g.totalQty;
     else if (g.qcStatus === "HOLD") r.hold += g.totalQty;
@@ -287,33 +306,6 @@ export interface PoProgress {
   closed: boolean;
 }
 
-export function derivePoProgress(purchaseOrders: PurchaseOrder[], grnLines: GrnLine[]): PoProgress[] {
-  return purchaseOrders.map((po) => {
-    const lines = po.lines.map((l) => {
-      const received = grnLines
-        .filter((g) => g.poNo === po.id && g.componentCode === l.componentCode)
-        .reduce((n, g) => n + g.totalQty, 0);
-      return {
-        code: l.componentCode,
-        name: l.componentName,
-        qty: l.qty,
-        rate: l.rate,
-        received,
-        pending: Math.max(0, l.qty - received),
-      };
-    });
-    const value = po.lines.every((l) => l.rate !== null)
-      ? po.lines.reduce((n, l) => n + l.qty * (l.rate ?? 0), 0)
-      : null;
-    return {
-      po,
-      lines,
-      value,
-      closed: po.status === "APPROVED" && lines.every((l) => l.pending === 0),
-    };
-  });
-}
-
 export interface OrderProgress {
   order: CustOrder;
   lines: { productName: string; productCode: string; qty: number; dispatched: number; balance: number }[];
@@ -334,6 +326,179 @@ export function deriveOrderProgress(orders: CustOrder[], dispatchSlips: Dispatch
   });
 }
 
+/** Tally quantities carry up to 3 decimals (Kg, Grs); sums are rounded back to that. */
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/** Stock is kept in pieces; "" is a receipt from before Tally POs (always pcs). */
+export const isPcs = (unit: string) => unit === "" || unit.toLowerCase() === "pcs";
+const sameUnit = (a: string, b: string) => (isPcs(a) && isPcs(b)) || a.toLowerCase() === b.toLowerCase();
+
+/** What Store counted for a gate-checked item, if its GRN exists. */
+const grnOf = (grnLines: GrnLine[], gateEntryId: string, lineNo: number) =>
+  grnLines.find((g) => g.gateEntryId === gateEntryId && g.gateLineNo === lineNo);
+
+/** One item that has come in against a PO, as the received rule counts it. */
+interface Arrival {
+  itemName: string;
+  itemCode: string;
+  qty: number;
+}
+
+/**
+ * What has come in against a PO. Per gate-checked item: Store's GRN count once the GRN exists, else the
+ * quantity checked in at the gate. Gate entries from before item-wise check-in (no items): their GRNs.
+ */
+function arrivalsFor(poNo: string, gateEntries: GateEntry[], grnLines: GrnLine[]): Arrival[] {
+  return gateEntries
+    .filter((g) => g.poNo === poNo)
+    .flatMap((g): Arrival[] =>
+      g.lines.length > 0
+        ? g.lines.map((l, i) => ({ itemName: l.itemName, itemCode: l.itemCode, qty: grnOf(grnLines, g.id, i + 1)?.totalQty ?? l.qty }))
+        : grnLines
+            .filter((r) => r.gateEntryId === g.id)
+            .map((r) => ({ itemName: r.componentName, itemCode: r.componentCode, qty: r.totalQty })),
+    );
+}
+
+/** The same PO item: by PMS code when both sides have one, else by name. */
+const sameItem = (a: { itemName: string; itemCode: string }, b: { itemName: string; itemCode: string }) =>
+  a.itemCode && b.itemCode ? a.itemCode === b.itemCode : a.itemName === b.itemName;
+
+// shortcut: a Tally item without PMS code is matched by name; renaming it in Tally after a receipt would stop
+// that receipt counting — match on Tally's line id once the live Tally API supplies it.
+const receivedOf = (arrived: Arrival[], item: { itemName: string; itemCode: string }) =>
+  r3(arrived.filter((a) => sameItem(a, item)).reduce((n, a) => n + a.qty, 0));
+
+/**
+ * The POs the gate receives against, one per number: POs raised and approved in this app, from the app's own record
+ * (Tally's copy of them only confirms they are in Tally), plus POs made in Tally (their synced copy). A PO of ours
+ * whose number Tally already gave another PO waits for its new number; that number is Tally's PO meanwhile.
+ */
+export function gatePos(s: Pick<FlowState, "tallyPos" | "purchaseOrders" | "poClosures">): TallyPo[] {
+  const closed = new Set(s.poClosures.filter((c) => c.closed).map((c) => c.poNo));
+  const approvedHere = s.purchaseOrders.filter((p) => p.status === "APPROVED" && !numberTaken(p));
+  const ours = new Set(approvedHere.map((p) => p.id));
+  return [
+    ...s.tallyPos.filter((p) => !ours.has(p.poNo)),
+    ...approvedHere.map(
+      (p): TallyPo => ({
+        poNo: p.id,
+        date: p.date,
+        supplierName: p.supplierName,
+        cancelled: false,
+        syncedAt: "",
+        guid: "",
+        alterId: 0,
+        lines: p.lines.map((l) => ({ itemName: l.componentName, itemCode: l.componentCode, qty: l.qty, unit: "Pcs" })),
+      }),
+    ),
+  ].map((p) => (closed.has(p.poNo) ? { ...p, closed: true } : p));
+}
+
+/**
+ * Whether Tally has confirmed a PO raised here, from the latest copy read from Tally (never stored, so it
+ * cannot go stale): same PO number with the same items and quantities in Pcs = IN_TALLY.
+ */
+export function tallyStatusOf(po: PurchaseOrder, tallyPos: TallyPo[]): "NOT_IN_TALLY" | "IN_TALLY" | "DIFFERS" {
+  const copy = tallyPos.find((t) => t.poNo === po.id);
+  if (!copy) return "NOT_IN_TALLY";
+  const same =
+    copy.lines.length === po.lines.length &&
+    po.lines.every((l) =>
+      copy.lines.some(
+        (t) => sameItem(t, { itemName: l.componentName, itemCode: l.componentCode }) && isPcs(t.unit) && t.qty === l.qty,
+      ),
+    );
+  return same && !copy.cancelled ? "IN_TALLY" : "DIFFERS";
+}
+
+/** How a refusal starts when Tally already has another PO with the number (the screen offers a new number). */
+export const NUMBER_TAKEN = "Tally already has a PO numbered";
+export const numberTaken = (po: PurchaseOrder) => po.tallyError.startsWith(NUMBER_TAKEN);
+
+export function derivePoProgress(purchaseOrders: PurchaseOrder[], gateEntries: GateEntry[], grnLines: GrnLine[]): PoProgress[] {
+  return purchaseOrders.map((po) => {
+    const arrived = arrivalsFor(po.id, gateEntries, grnLines);
+    const lines = po.lines.map((l) => {
+      const received = receivedOf(arrived, { itemName: l.componentName, itemCode: l.componentCode });
+      return {
+        code: l.componentCode,
+        name: l.componentName,
+        qty: l.qty,
+        rate: l.rate,
+        received,
+        pending: Math.max(0, r3(l.qty - received)),
+      };
+    });
+    const value = po.lines.every((l) => l.rate !== null)
+      ? po.lines.reduce((n, l) => n + l.qty * (l.rate ?? 0), 0)
+      : null;
+    return {
+      po,
+      lines,
+      value,
+      closed: po.status === "APPROVED" && lines.every((l) => l.pending === 0),
+    };
+  });
+}
+
+export interface TallyPoProgress {
+  po: TallyPo;
+  /** Per item: what has come in at the gate so far, and what is still pending. */
+  lines: (TallyPoLine & { received: number; pending: number })[];
+  /** Shown at the gate until every item is fully received (and the PO is not cancelled in Tally). */
+  open: boolean;
+}
+
+/** The PO itself never changes; what it has received follows the one received rule (arrivalsFor). */
+export function deriveTallyPoProgress(pos: TallyPo[], gateEntries: GateEntry[], grnLines: GrnLine[]): TallyPoProgress[] {
+  return pos.map((po) => {
+    const arrived = arrivalsFor(po.poNo, gateEntries, grnLines);
+    const lines = po.lines.map((l) => {
+      const received = receivedOf(arrived, l);
+      return { ...l, received, pending: Math.max(0, r3(l.qty - received)) };
+    });
+    return { po, lines, open: !po.cancelled && !po.closed && lines.some((l) => l.pending > 0) };
+  });
+}
+
+/** One gate-checked item (or a whole arrival without PO) that Store has not made a GRN for yet. */
+export interface AwaitingGrn {
+  gate: GateEntry;
+  /** 1-based line of the gate entry; null for an arrival without PO. */
+  lineNo: number | null;
+  line: GateEntryLine | null;
+}
+
+export function awaitingGrn(gateEntries: GateEntry[], grnLines: GrnLine[]): AwaitingGrn[] {
+  return gateEntries.flatMap((gate): AwaitingGrn[] =>
+    gate.lines.length > 0
+      ? gate.lines.map((line, i) => ({ gate, lineNo: i + 1, line })).filter((x) => !grnOf(grnLines, gate.id, x.lineNo))
+      : grnLines.some((r) => r.gateEntryId === gate.id)
+        ? []
+        : [{ gate, lineNo: null, line: null }],
+  );
+}
+
+/* ── searches (gate and GRN): any part of any field, any case ─────────────────── */
+
+const matches = (term: string, fields: string[]) => {
+  const t = term.trim().toLowerCase();
+  return !t || fields.some((f) => f.toLowerCase().includes(t));
+};
+
+/** Open POs by PO number, supplier, item name or PMS code. */
+export function searchPos(pos: TallyPoProgress[], term: string): TallyPoProgress[] {
+  return pos.filter((p) => matches(term, [p.po.poNo, p.po.supplierName, ...p.lines.flatMap((l) => [l.itemName, l.itemCode])]));
+}
+
+/** Items waiting for GRN by gate entry, PO number, supplier, item name or PMS code. */
+export function searchAwaitingGrn(items: AwaitingGrn[], term: string): AwaitingGrn[] {
+  return items.filter((w) =>
+    matches(term, [w.gate.id, w.gate.poNo, w.gate.supplierName, w.line?.itemName ?? w.gate.productDesc, w.line?.itemCode ?? ""]),
+  );
+}
+
 /* ── reducers: one per register action ──────────────────────────────────────── */
 
 type Rejected = never;
@@ -343,20 +508,108 @@ const reject = (message: string): Rejected => {
 
 export const reducers = {
   addGateEntry(s: FlowState, e: Omit<GateEntry, "id">): FlowState {
+    let supplierName = e.supplierName;
+    let productDesc = e.productDesc;
+    let lines: GateEntryLine[] = [];
+    if (e.poNo) {
+      const progress = deriveTallyPoProgress(
+        gatePos(s).filter((p) => p.poNo === e.poNo),
+        s.gateEntries,
+        s.grnLines,
+      )[0];
+      if (s.purchaseOrders.some((p) => p.id === e.poNo && p.status !== "APPROVED") && !progress) {
+        reject(`PO ${e.poNo} is waiting for the owner's approval — material cannot come in against it yet.`);
+      }
+      if (!progress) return reject(`PO ${e.poNo} is not among the purchase orders. Search again.`);
+      if (progress.po.cancelled) reject(`PO ${e.poNo} is cancelled in Tally.`);
+      if (progress.po.closed) reject(`PO ${e.poNo} is closed — Purchase can reopen it if material is still due.`);
+      if (!progress.open) reject(`PO ${e.poNo} is already fully received.`);
+      if (e.lines.length === 0) reject("Tick at least one item that has arrived.");
+      const ticked = new Set<string>();
+      // Item name, code and unit are the PO's own — only the quantity and remark come from the gate.
+      lines = e.lines.map((l) => {
+        const item = progress.lines.find((x) => x.itemName === l.itemName);
+        if (!item) return reject(`${l.itemName} is not on PO ${e.poNo}.`);
+        if (ticked.has(item.itemName)) reject(`${item.itemName} is ticked twice.`);
+        ticked.add(item.itemName);
+        // Never more than is still pending on the PO (client's rule: no over-supply is accepted).
+        if (l.qty > item.pending) {
+          reject(`${item.itemName}: ${l.qty} ${item.unit} is more than the ${item.pending} ${item.unit} still pending on PO ${e.poNo}.`);
+        }
+        return { itemName: item.itemName, itemCode: item.itemCode, unit: item.unit, qty: l.qty, remark: l.remark };
+      });
+      // Against a PO the supplier is the PO's — never retyped at the gate.
+      supplierName = progress.po.supplierName;
+      productDesc = lines.map((l) => l.itemName).join(", ");
+    } else {
+      if (e.lines.length > 0) reject("Items can only be checked in against a PO.");
+      if (!supplierName.trim()) reject("Supplier name is required when there is no PO.");
+      if (!productDesc.trim()) reject("Product / material is required when there is no PO.");
+    }
+    const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+    if (e.invoiceNo && s.gateEntries.some((g) => same(g.invoiceNo, e.invoiceNo) && same(g.supplierName, supplierName))) {
+      reject(`Invoice ${e.invoiceNo} from ${supplierName} is already in the gate register.`);
+    }
     return {
       ...s,
-      gateEntries: [...s.gateEntries, { ...e, id: numberFor(s, "GE", s.gateEntries.map((x) => x.id)) }],
+      gateEntries: [
+        ...s.gateEntries,
+        {
+          ...e,
+          supplierName,
+          productDesc,
+          // Against a PO the quantities are per item, in each item's own unit.
+          invoiceQty: e.poNo ? null : e.invoiceQty,
+          lines,
+          timeOut: "",
+          id: numberFor(s, "GE", s.gateEntries.map((x) => x.id)),
+        },
+      ],
+    };
+  },
+
+  /** The vehicle leaves after unloading: time out (server clock) and the driver's sign, once. */
+  recordVehicleOut(s: FlowState, gateEntryId: string, driverSign: boolean, time: string): FlowState {
+    const g = s.gateEntries.find((x) => x.id === gateEntryId);
+    if (!g) return reject(`Gate entry ${gateEntryId} not found.`);
+    if (g.timeOut) reject(`The vehicle of ${gateEntryId} already left at ${g.timeOut}.`);
+    return {
+      ...s,
+      gateEntries: s.gateEntries.map((x) =>
+        x.id === gateEntryId ? { ...x, timeOut: time, driverSign: x.driverSign || driverSign } : x,
+      ),
     };
   },
 
   addGrnLine(s: FlowState, l: Omit<GrnLine, "grnNo" | "qcStatus" | "barcoded">): FlowState {
-    if (!s.gateEntries.some((g) => g.id === l.gateEntryId)) reject(`Gate entry ${l.gateEntryId} not found.`);
+    const gate = s.gateEntries.find((g) => g.id === l.gateEntryId);
+    if (!gate) return reject(`Gate entry ${l.gateEntryId} not found.`);
+    let grn = l;
+    if (gate.lines.length > 0) {
+      // Against a PO: one GRN per gate-checked item, in the PO's unit, never more than came in.
+      const item = l.gateLineNo === null ? undefined : gate.lines[l.gateLineNo - 1];
+      if (!item) return reject(`Pick the item of ${gate.id} this GRN is for.`);
+      if (grnOf(s.grnLines, gate.id, l.gateLineNo!)) reject(`${item.itemName} of ${gate.id} already has a GRN.`);
+      if (item.itemCode && item.itemCode !== l.componentCode) {
+        reject(`${item.itemName} is ${item.itemCode} — the GRN must use that code.`);
+      }
+      if (l.totalQty > item.qty) {
+        reject(`${item.itemName}: ${l.totalQty} ${item.unit} counted is more than the ${item.qty} ${item.unit} checked in at the gate.`);
+      }
+      const poLine = gatePos(s).find((p) => p.poNo === gate.poNo)?.lines.find((x) => sameItem(x, item));
+      grn = { ...l, unit: item.unit, poQty: poLine?.qty ?? null };
+    } else if (l.gateLineNo !== null) {
+      reject(`${gate.id} has no PO items — it was an arrival without PO.`);
+    } else {
+      grn = { ...l, unit: "" }; // arrival without PO: counted in pcs, as on the GRN sheet
+    }
+    if (l.totalQty <= 0) reject("The counted quantity must be more than zero.");
     return {
       ...s,
       grnLines: [
         ...s.grnLines,
         {
-          ...l,
+          ...grn,
           grnNo: numberFor(s, "GR", s.grnLines.map((x) => x.grnNo)),
           qcStatus: "UNDER_TEST" as const,
           barcoded: false,
@@ -366,9 +619,11 @@ export const reducers = {
   },
 
   updateGrnQty(s: FlowState, grnNo: string, totalQty: number): FlowState {
-    const qty = Math.max(0, Math.round(totalQty));
     const g = s.grnLines.find((x) => x.grnNo === grnNo);
     if (!g) return reject(`GRN ${grnNo} not found.`);
+    const qty = Math.max(0, isPcs(g.unit) ? Math.round(totalQty) : r3(totalQty));
+    const item = g.gateLineNo === null ? undefined : s.gateEntries.find((x) => x.id === g.gateEntryId)?.lines[g.gateLineNo - 1];
+    if (item && qty > item.qty) reject(`${item.itemName}: ${qty} ${item.unit} is more than the ${item.qty} ${item.unit} checked in at the gate.`);
     // The count can be corrected only until the GRN goes to QC: from then on QC tests
     // exactly what the slip says, and nothing upstream of a passed stage may change.
     if (s.qcIntimations.some((q) => q.grnNo === grnNo) || g.qcStatus !== "UNDER_TEST") {
@@ -652,11 +907,25 @@ export const reducers = {
     };
   },
 
-  raisePo(s: FlowState, p: Omit<PurchaseOrder, "id" | "status" | "approvedBy">): FlowState {
-    for (const id of p.indentIds) {
+  raisePo(s: FlowState, p: Omit<PurchaseOrder, "id" | "status" | "approvedBy" | "tallyPushedAt" | "tallyError">): FlowState {
+    if (p.indentIds.length === 0) reject("Tick at least one indent for the PO.");
+    // One PO gathers open indents of ONE vendor; each item is one PO line.
+    const inds = p.indentIds.map((id) => {
       const ind = s.indents.find((i) => i.id === id);
-      if (!ind) reject(`Indent ${id} not found.`);
-      if (ind!.status !== "OPEN") reject(`Indent ${id} already has a PO.`);
+      if (!ind) return reject(`Indent ${id} not found.`);
+      if (ind.status !== "OPEN") reject(`Indent ${id} already has a PO.`);
+      if (ind.supplierName && ind.supplierName !== p.supplierName) {
+        reject(`Indent ${id} is for ${ind.supplierName}, not ${p.supplierName}.`);
+      }
+      return ind;
+    });
+    const codes = p.lines.map((l) => l.componentCode);
+    if (new Set(codes).size !== codes.length) reject("Each item can be on the PO only once — combine its indents into one line.");
+    for (const ind of inds) {
+      if (!codes.includes(ind.componentCode)) reject(`${ind.componentName} (indent ${ind.id}) is not on the PO.`);
+    }
+    for (const l of p.lines) {
+      if (!inds.some((i) => i.componentCode === l.componentCode)) reject(`${l.componentName} has no ticked indent.`);
     }
     return {
       ...s,
@@ -667,10 +936,57 @@ export const reducers = {
           id: numberFor(s, "PO", [...s.purchaseOrders.map((x) => x.id), ...s.gateEntries.map((g) => g.poNo)]),
           status: "PENDING_APPROVAL" as const,
           approvedBy: "",
+          tallyPushedAt: "",
+          tallyError: "",
         },
       ],
       indents: s.indents.map((i) => (p.indentIds.includes(i.id) ? { ...i, status: "PO_RAISED" as const } : i)),
     };
+  },
+
+  /** Purchase marks a PO closed (e.g. received before go-live, vendor won't supply the balance). */
+  closePo(s: FlowState, poNo: string, reason: string, date: string, by: string): FlowState {
+    if (!gatePos(s).some((p) => p.poNo === poNo)) reject(`PO ${poNo} not found (or not approved yet).`);
+    if (!reason.trim()) reject("Give a reason for closing the PO.");
+    const prev = s.poClosures.find((c) => c.poNo === poNo);
+    if (prev?.closed) reject(`PO ${poNo} is already closed.`);
+    const closure: PoClosure = { poNo, closed: true, date, by, reason: reason.trim() };
+    return {
+      ...s,
+      poClosures: prev ? s.poClosures.map((c) => (c.poNo === poNo ? closure : c)) : [...s.poClosures, closure],
+    };
+  },
+
+  reopenPo(s: FlowState, poNo: string, date: string, by: string): FlowState {
+    const prev = s.poClosures.find((c) => c.poNo === poNo);
+    if (!prev?.closed) return reject(`PO ${poNo} is not closed.`);
+    return {
+      ...s,
+      poClosures: s.poClosures.map((c) => (c.poNo === poNo ? { ...c, closed: false, date, by, reason: "reopened" } : c)),
+    };
+  },
+
+  /**
+   * Go-live cut-over: every PO dated before `before` that has nothing received in this app is closed —
+   * Tally cannot tell which old POs were received (most purchase invoices don't name their PO).
+   */
+  closePosBefore(s: FlowState, before: string, reason: string, date: string, by: string): FlowState {
+    if (!reason.trim()) reject("Give a reason for the cut-over.");
+    const already = new Set(s.poClosures.filter((c) => c.closed).map((c) => c.poNo));
+    const toClose = gatePos(s).filter(
+      (p) =>
+        dateKey(p.date) < dateKey(before) &&
+        !p.cancelled &&
+        !already.has(p.poNo) &&
+        arrivalsFor(p.poNo, s.gateEntries, s.grnLines).length === 0,
+    );
+    if (toClose.length === 0) reject(`No open PO dated before ${before} without receipts.`);
+    let next = s.poClosures;
+    for (const p of toClose) {
+      const closure: PoClosure = { poNo: p.poNo, closed: true, date, by, reason: reason.trim() };
+      next = next.some((c) => c.poNo === p.poNo) ? next.map((c) => (c.poNo === p.poNo ? closure : c)) : [...next, closure];
+    }
+    return { ...s, poClosures: next };
   },
 
   approvePo(s: FlowState, poId: string, approvedBy: string): FlowState {

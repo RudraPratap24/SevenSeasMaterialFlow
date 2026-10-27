@@ -14,4 +14,6 @@ export const HEADER: Record<DocCollection, { table: string; key: string }> = {
   dispatchSlips: { table: "dispatch_slips", key: "dispatch_no" },
   indents: { table: "purchase_indents", key: "indent_no" },
   purchaseOrders: { table: "purchase_orders", key: "po_no" },
+  tallyPos: { table: "tally_purchase_orders", key: "po_no" },
+  poClosures: { table: "po_closures", key: "po_no" },
 };

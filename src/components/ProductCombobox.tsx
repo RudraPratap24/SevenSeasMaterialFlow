@@ -121,7 +121,7 @@ export function ProductCombobox({ products, onSelect, value, onSelected }: Props
 
       {open && (
         <div
-          className="absolute left-0 right-0 top-[36px] z-30 overflow-hidden rounded-[3px] border border-rule bg-card shadow-[0_6px_18px_rgba(22,40,61,.13)]"
+          className="absolute left-0 right-0 top-[36px] z-30 overflow-hidden rounded-[3px] border border-rule bg-card shadow-[0_6px_18px_rgba(0,0,0,.13)]"
           // Keep focus in the input so the click lands as a selection, not a blur.
           onMouseDown={(e) => e.preventDefault()}
         >

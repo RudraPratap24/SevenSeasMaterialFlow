@@ -24,7 +24,7 @@ console.log("concurrency: 8 GRNs at once get 8 distinct numbers");
 {
   const c = client(); await c("POST", "/api/auth/login", { username: "store", password: "seven@store" });
   const ge = (await c("GET", "/api/state")).json.state.gateEntries[0].id;
-  const body = { args: [{ gateEntryId: ge, componentCode: "PMS0002", componentName: "", type: "", brandName: "", receivedDate: "", poNo: "", poQty: null, invoiceNo: "", supplierName: "", qtyPerBox: 10, totalBoxes: 1, totalQty: 10, remarkStore: "", location: "" }] };
+  const body = { args: [{ gateEntryId: ge, gateLineNo: null, unit: "", componentCode: "PMS0002", componentName: "", type: "", brandName: "", receivedDate: "", poNo: "", poQty: null, invoiceNo: "", supplierName: "", qtyPerBox: 10, totalBoxes: 1, totalQty: 10, remarkStore: "", location: "" }] };
   const rs = await Promise.all(Array.from({ length: 8 }, () => c("POST", "/api/actions/addGrnLine", body)));
   check("all 8 succeeded", rs.every((r) => r.status === 200), rs.map((r) => r.status).join(","));
   const nos = (await c("GET", "/api/state")).json.state.grnLines.map((g) => g.grnNo);

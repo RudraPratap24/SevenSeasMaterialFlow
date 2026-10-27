@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { Router } from "express";
+import { Router, type Request } from "express";
 import rateLimit from "express-rate-limit";
 import type { RowDataPacket } from "mysql2/promise";
 import { z } from "zod";
-import { emptyState, FlowError } from "../../src/flow/logic";
-import { PERMS, PRICE_ROLES, roleCan } from "../../src/flow/perms";
+import { emptyState, FlowError, NUMBER_TAKEN } from "../../src/flow/logic";
+import { PERMS, PRICE_ROLES, READ_SCOPES, roleCan } from "../../src/flow/perms";
 import type { FlowState } from "../../src/flow/types";
 import { seedState } from "../seed/demoStory";
 import { ACTIONS, applyAction, context, describeIssues, isActionName } from "./actions";
@@ -30,6 +30,7 @@ import {
   type Versions,
 } from "./repository";
 import { scopeStateFor } from "./scope";
+import { markPush, pushPoToTally, renumberForTally } from "./tallyPush";
 import { requirePasswordCurrent, requireUser } from "./sessions";
 
 export const flowRouter = Router();
@@ -134,6 +135,24 @@ flowRouter.get("/masters", async (req, res) => {
   });
 });
 
+/** The last Tally sync: when, what it brought, and POs left out (those only for Purchase/Admin). */
+flowRouter.get("/tally-status", async (req, res) => {
+  const role = req.user!.role;
+  if (!READ_SCOPES[role].includes("tallyPos")) {
+    res.status(403).json({ error: "Not allowed." });
+    return;
+  }
+  const [r] = await pool.query<RowDataPacket[]>("SELECT k, v FROM app_meta WHERE k IN ('tally_status', 'tally_sync_error')");
+  const meta = (k: string) => JSON.parse(String(r.find((x) => x.k === k)?.v ?? "null"));
+  const status = meta("tally_status");
+  const syncError = meta("tally_sync_error");
+  if (!PRICE_ROLES.includes(role)) {
+    res.json({ status: status ? { syncedAt: status.syncedAt } : null });
+    return;
+  }
+  res.json({ status: status || syncError ? { ...(status ?? { syncedAt: "" }), syncError } : null });
+});
+
 flowRouter.get("/masters/suppliers", async (req, res) => {
   if (!PRICE_ROLES.includes(req.user!.role)) {
     res.status(403).json({ error: "Not allowed." });
@@ -151,6 +170,8 @@ const ActionBody = z.strictObject({
 });
 
 const LABEL: Record<string, string> = {
+  gateEntries: "Gate entry",
+  poClosures: "PO status",
   grnLines: "GRN",
   qcIntimations: "QC slip",
   requisitions: "Requisition",
@@ -212,6 +233,8 @@ flowRouter.post("/actions/:name", async (req, res) => {
     // so it includes everyone's changes up to the version it reports.
     const r = await withConn((conn) => loadConsistent(conn, changedSince(basis)));
     res.json({ version: r.version, resyncVersion: r.resyncVersion, changes: scopeStateFor(user.role, r.state) });
+    // An approved PO goes to Tally on its own, after the answer — the approval stands whatever Tally says.
+    if (name === "approvePo" && config.TALLY_ALLOW_WRITE) void sendToTally(req, String(parsed.data[0]));
   } catch (err) {
     if (err instanceof FlowError) {
       await audit(req, { action: name, outcome: "rejected", message: err.message, payload: parsed.data });
@@ -220,6 +243,72 @@ flowRouter.post("/actions/:name", async (req, res) => {
     }
     throw err;
   }
+});
+
+/* ── approved PO → Tally ─────────────────────────────────────────────────────── */
+
+/** Creates the PO in Tally and keeps the result on it (when; Tally's reason if it refused). Returns the error, "" = created. */
+async function sendToTally(req: Request, poNo: string): Promise<string> {
+  let error = "";
+  try {
+    await withLocks([`tally-push:${poNo}`], (conn) => pushPoToTally(conn, poNo));
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e);
+  }
+  try {
+    await withLocks([`doc:purchaseOrders:${poNo}`], (conn) => markPush(conn, poNo, error));
+    await audit(req, { action: "tally.push", outcome: error ? "rejected" : "ok", message: `${poNo}: ${error || "created in Tally"}` });
+  } catch (e) {
+    console.error(JSON.stringify({ msg: "tally push result not saved", poNo, err: String(e) }));
+  }
+  return error;
+}
+
+/** "Retry": send an approved PO to Tally again (after Tally was closed, or a vendor/item was fixed there). */
+flowRouter.post("/tally/push", async (req, res) => {
+  if (!roleCan(req.user!.role, "purchase.tally")) {
+    res.status(403).json({ error: "Your login is not allowed to do this." });
+    return;
+  }
+  const body = z.strictObject({ poNo: z.string().trim().min(1).max(40) }).safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Invalid request." });
+    return;
+  }
+  const error = await sendToTally(req, body.data.poNo);
+  res.status(error ? 409 : 200).json(error ? { error } : { ok: true });
+});
+
+/**
+ * "New number & send": Tally refused the PO because another PO there already has its number. The PO takes the next
+ * number Tally does not have (everywhere: lines, indents, every screen) and is sent under it.
+ */
+flowRouter.post("/tally/renumber", async (req, res) => {
+  if (!roleCan(req.user!.role, "purchase.tally")) {
+    res.status(403).json({ error: "Your login is not allowed to do this." });
+    return;
+  }
+  const body = z.strictObject({ poNo: z.string().trim().min(1).max(40) }).safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Invalid request." });
+    return;
+  }
+  let poNo = body.data.poNo;
+  let error = "";
+  try {
+    // a number typed in Tally in the very same seconds is refused at sending — then the next one
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const was = poNo;
+      poNo = await withLocks([`doc:purchaseOrders:${was}`], (conn) => renumberForTally(conn, was));
+      await audit(req, { action: "tally.renumber", outcome: "ok", message: `${was} is now ${poNo}: Tally already had ${was}` });
+      error = await sendToTally(req, poNo);
+      if (!error.startsWith(NUMBER_TAKEN)) break;
+    }
+  } catch (e) {
+    if (!(e instanceof FlowError)) throw e;
+    error = e.message;
+  }
+  res.status(error ? 409 : 200).json(error ? { error, poNo } : { ok: true, poNo });
 });
 
 /* ── demo reset: admin only, switched on per system, re-authenticated ─────────── */

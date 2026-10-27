@@ -88,6 +88,7 @@ interface FlowApi {
   /** Re-reads the registers now (e.g. after a master-data change elsewhere on screen). */
   reload(): Promise<void>;
   addGateEntry: Mutation<"addGateEntry">;
+  recordVehicleOut: Mutation<"recordVehicleOut">;
   addGrnLine: Mutation<"addGrnLine">;
   updateGrnQty: Mutation<"updateGrnQty">;
   sendToQc: Mutation<"sendToQc">;
@@ -106,6 +107,9 @@ interface FlowApi {
   addIndent: Mutation<"addIndent">;
   raisePo: Mutation<"raisePo">;
   approvePo: Mutation<"approvePo">;
+  closePo: Mutation<"closePo">;
+  reopenPo: Mutation<"reopenPo">;
+  closePosBefore: Mutation<"closePosBefore">;
   /** Admin reset — needs the admin's password and the typed phrase; the server keeps a snapshot. */
   clearAll(password: string, confirm: string): Promise<ResetResult>;
   loadDemo(password: string, confirm: string): Promise<ResetResult>;
@@ -280,7 +284,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
   );
 
   const poProgress = useMemo(
-    () => derivePoProgress(state.purchaseOrders, state.grnLines),
+    () => derivePoProgress(state.purchaseOrders, state.gateEntries, state.grnLines),
     [state.purchaseOrders, state.grnLines],
   );
   const orderProgress = useMemo(
@@ -340,6 +344,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       dismissError: () => setError(null),
       reload: refresh,
       addGateEntry: action("addGateEntry"),
+      recordVehicleOut: action("recordVehicleOut"),
       addGrnLine: action("addGrnLine"),
       updateGrnQty: action("updateGrnQty"),
       sendToQc: action("sendToQc"),
@@ -358,6 +363,9 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       addIndent: action("addIndent"),
       raisePo: action("raisePo"),
       approvePo: action("approvePo"),
+      closePo: action("closePo"),
+      reopenPo: action("reopenPo"),
+      closePosBefore: action("closePosBefore"),
       clearAll: reset("clear"),
       loadDemo: reset("load"),
       traceBatch: (batchNo) => traceBatchOf(state, batchNo),
@@ -366,4 +374,33 @@ export function FlowProvider({ children }: { children: ReactNode }) {
   }, [state, pmStock, fgStock, poProgress, orderProgress, shortList, suppliers, masters, epoch, loaded, busy, error, send, applyFull, refresh]);
 
   return <Ctx.Provider value={api_}>{children}</Ctx.Provider>;
+}
+
+/** The last Tally sync, as the server recorded it (re-read every minute). */
+export interface TallyStatus {
+  syncedAt: string;
+  /** Purchase/Admin: the scheduled sync is failing (since when, last try, why) — null when it works. */
+  syncError?: { since: string; at: string; error: string } | null;
+  items?: { read: number; added: number; renamed: number };
+  vendors?: { read: number; added: number };
+  pos?: { read: number; added: number; updated: number; cancelled: number; withoutItems: number; withoutCode: number };
+  skipped?: { poNo: string; reason: string }[];
+}
+
+export function useTallyStatus(): TallyStatus | null {
+  const [status, setStatus] = useState<TallyStatus | null>(null);
+  useEffect(() => {
+    let live = true;
+    const load = () =>
+      api<{ status: TallyStatus | null }>("GET", "/tally-status")
+        .then((r) => live && setStatus(r.status))
+        .catch(() => undefined);
+    load();
+    const t = window.setInterval(load, 30_000);
+    return () => {
+      live = false;
+      window.clearInterval(t);
+    };
+  }, []);
+  return status;
 }

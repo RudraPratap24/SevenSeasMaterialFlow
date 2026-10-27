@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { reducers, nowHHMM, todayLabel, FlowError, type ActionName } from "../../src/flow/logic";
+import { reducers, nowHHMM, todayLabel, dateKey, FlowError, type ActionName } from "../../src/flow/logic";
 import type { Action } from "../../src/flow/perms";
 import type { FlowState, Supplier } from "../../src/flow/types";
 import type { MasterData } from "./repository";
@@ -48,13 +48,23 @@ const docNo = z
 const dateLabel = z
   .string()
   .trim()
-  .regex(/^(\d{2}-\d{2}-\d{4})?$/, "must be dd-mm-yyyy");
-const timeLabel = z
+  .regex(/^(\d{2}-\d{2}-\d{4})?$/, "must be dd-mm-yyyy")
+  .refine((d) => {
+    if (!d) return true;
+    const [dd, mm, yyyy] = d.split("-").map(Number);
+    const t = new Date(Date.UTC(yyyy, mm - 1, dd));
+    return t.getUTCDate() === dd && t.getUTCMonth() === mm - 1;
+  }, "is not a real date");
+const requiredTime = z
   .string()
   .trim()
-  .regex(/^(([01]\d|2[0-3]):[0-5]\d)?$/, "must be hh:mm");
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "is required (hh:mm)");
 const qty = z.number().int("must be a whole number").min(0).max(100_000_000);
 const positiveQty = qty.min(1, "must be more than zero");
+/** A quantity in the PO's unit (Kg, Doz …): up to 3 decimals. */
+const threeDecimals = (n: number) => Math.round(n * 1000) / 1000 === n;
+const unitQtyOrZero = z.number().min(0).max(100_000_000).refine(threeDecimals, "has more than 3 decimals");
+const unitQty = z.number().positive("must be more than zero").max(100_000_000).refine(threeDecimals, "has more than 3 decimals");
 const componentCode = z
   .string()
   .trim()
@@ -76,6 +86,16 @@ function product(ctx: ActionContext, name: string) {
   return p;
 }
 
+/**
+ * An approved supplier — and, once vendors come from Tally, one that is a ledger in Tally, so every PO can be created
+ * there. (A database with no Tally vendors yet — demo, tests — keeps using the approved list.)
+ */
+function tallyVendor(ctx: ActionContext, name: string) {
+  const s = ctx.suppliers.find((x) => x.name === name);
+  if (!s) throw new FlowError(`${name} is not an approved supplier.`);
+  if (!s.fromTally && ctx.suppliers.some((x) => x.fromTally)) throw new FlowError(`${name} is not a vendor in Tally — pick a Tally vendor.`);
+}
+
 /* ── the registry ───────────────────────────────────────────────────────────── */
 
 export const ACTIONS: Record<ActionName, ActionDef> = {
@@ -84,22 +104,47 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
     args: z.tuple([
       z.strictObject({
         date: text(10),
-        supplierName: required(120),
+        // Required only without a PO (checked in the reducer); against a PO both come from the PO.
+        supplierName: text(120),
         productDesc: text(300),
+        // Not compulsory: free material (e.g. POP with a PO) arrives without an invoice.
         invoiceNo: text(60),
         invoiceDate: dateLabel,
         poNo: text(40),
         invoiceQty: qty.nullable(),
         transportName: text(120),
         lrNo: text(60),
-        vehicleNo: text(30),
-        timeIn: timeLabel,
-        timeOut: timeLabel,
+        vehicleNo: required(30),
+        timeIn: requiredTime,
+        timeOut: z.literal(""), // recorded later, by recordVehicleOut
         driverSign: z.boolean(),
         remark,
+        // Name/code/unit are replaced by the PO's own in the reducer; qty and remark are the guard's.
+        lines: z
+          .array(
+            z.strictObject({
+              itemName: required(160),
+              itemCode: text(16),
+              unit: text(16),
+              qty: unitQty,
+              remark: text(300),
+            }),
+          )
+          .max(200),
       }),
     ]),
-    prepare: ([e], ctx) => [{ ...(e as object), date: ctx.today }],
+    prepare: ([e], ctx) => {
+      const g = e as { invoiceDate: string; timeIn: string };
+      if (dateKey(g.invoiceDate) > dateKey(ctx.today)) throw new FlowError("Invoice date cannot be after today.");
+      if (g.timeIn > ctx.now) throw new FlowError(`Time in cannot be later than now (${ctx.now}).`);
+      return [{ ...(e as object), date: ctx.today }];
+    },
+  },
+
+  recordVehicleOut: {
+    perm: "gate.create",
+    args: z.tuple([docNo, z.boolean(), text(5)]),
+    prepare: ([id, signed], ctx) => [id, signed, ctx.now], // the server clock, not the browser's
   },
 
   addGrnLine: {
@@ -107,18 +152,20 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
     args: z.tuple([
       z.strictObject({
         gateEntryId: docNo,
+        gateLineNo: z.number().int().min(1).max(200).nullable(),
         componentCode,
         componentName: text(160),
         type: text(40),
         brandName: text(60),
         receivedDate: text(10),
         poNo: text(40),
-        poQty: qty.nullable(),
+        poQty: unitQty.nullable(),
         invoiceNo: text(60),
         supplierName: text(120),
         qtyPerBox: positiveQty.nullable(),
         totalBoxes: positiveQty.nullable(),
-        totalQty: positiveQty,
+        totalQty: unitQty,
+        unit: text(16), // set by the reducer from the gate-checked item
         remarkStore: remark,
         location: text(80),
       }),
@@ -146,7 +193,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
     },
   },
 
-  updateGrnQty: { perm: "grn.qty", args: z.tuple([docNo, qty]) },
+  updateGrnQty: { perm: "grn.qty", args: z.tuple([docNo, unitQtyOrZero]) },
 
   sendToQc: {
     perm: "grn.sendqc",
@@ -388,6 +435,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
 
   addIndent: {
     perm: "purchase.indent",
+    needsSuppliers: true,
     args: z.tuple([
       z.strictObject({
         date: text(10),
@@ -395,10 +443,13 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
         componentName: text(160),
         qty: positiveQty,
         reason: text(200),
+        supplierName: required(120),
+        rate: z.number().positive("is required (₹ per unit)").max(10_000_000),
       }),
     ]),
     prepare: ([i], ctx) => {
-      const ind = i as { componentCode: string } & Record<string, unknown>;
+      const ind = i as { componentCode: string; supplierName: string } & Record<string, unknown>;
+      tallyVendor(ctx, ind.supplierName);
       return [{ ...ind, date: ctx.today, componentName: component(ctx, ind.componentCode).name }];
     },
   },
@@ -416,7 +467,8 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
               componentCode,
               componentName: text(160),
               qty: positiveQty,
-              rate: z.number().min(0).max(10_000_000).nullable(),
+              // Every new PO line has its rate, so every PO has a total.
+              rate: z.number().positive("is required (₹ per unit)").max(10_000_000),
             }),
           )
           .min(1)
@@ -427,9 +479,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
     ]),
     prepare: ([p], ctx) => {
       const po = p as { supplierName: string; lines: { componentCode: string }[] } & Record<string, unknown>;
-      if (!ctx.suppliers.some((s) => s.name === po.supplierName)) {
-        throw new FlowError(`${po.supplierName} is not an approved supplier.`);
-      }
+      tallyVendor(ctx, po.supplierName);
       return [
         {
           ...po,
@@ -445,6 +495,25 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
     args: z.tuple([docNo, text(80)]),
     // Signed with the identity of whoever is logged in — not whatever the client typed.
     prepare: ([id], ctx) => [id, ctx.user.label],
+  },
+
+  // Closing, reopening and the cut-over are dated and signed by the server.
+  closePo: {
+    perm: "purchase.close",
+    args: z.tuple([docNo, required(200), text(10), text(80)]),
+    prepare: ([po, reason], ctx) => [po, reason, ctx.today, ctx.user.label],
+  },
+
+  reopenPo: {
+    perm: "purchase.close",
+    args: z.tuple([docNo, text(10), text(80)]),
+    prepare: ([po], ctx) => [po, ctx.today, ctx.user.label],
+  },
+
+  closePosBefore: {
+    perm: "purchase.cutover",
+    args: z.tuple([dateLabel.refine((d) => d !== "", "is required"), required(200), text(10), text(80)]),
+    prepare: ([before, reason], ctx) => [before, reason, ctx.today, ctx.user.label],
   },
 };
 

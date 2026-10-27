@@ -3,15 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --ink: #16283d;
-  --paper: #e9eef3;
+  --ink: #111111;
+  --paper: #f2f2f2;
   --card: #ffffff;
-  --rule: #d8e0e8;
-  --muted: #64798f;
+  --rule: #dcdcdc;
+  --muted: #666666;
 
-  --blue: #1b4d8f;
-  --blue-dk: #143a6b;
-  --blue-soft: #eaf1f9;
+  --blue: #111111;
+  --blue-dk: #000000;
+  --blue-soft: #f0f0f0;
 
   --red: #b3261e;
   --red-soft: #fbeae8;
@@ -109,7 +109,7 @@
   }
   .btn:hover:not(:disabled) {
     background: var(--blue-soft);
-    border-color: #b9cbe0;
+    border-color: #9e9e9e;
   }
   .btn:disabled {
     opacity: 0.5;
@@ -142,7 +142,7 @@
     font-size: 13px;
   }
   .field:hover {
-    border-color: #b9cbe0;
+    border-color: #9e9e9e;
   }
 
   .card {
@@ -202,7 +202,7 @@
   }
 
   .card {
-    border-color: #b6c2ce;
+    border-color: #a8a8a8;
     break-inside: auto;
   }
 

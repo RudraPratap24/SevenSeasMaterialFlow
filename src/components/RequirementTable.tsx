@@ -82,7 +82,7 @@ const Row = memo(function Row({ row, zebra }: { row: RequirementRow; zebra: bool
     <div
       role="row"
       className="print-row border-b border-rule px-3 pb-1.5 pt-1.5"
-      style={{ background: zebra ? "#FBFCFD" : "var(--card)" }}
+      style={{ background: zebra ? "#FAFAFA" : "var(--card)" }}
     >
       <div className="grid items-center gap-2" style={{ gridTemplateColumns: COLS }}>
         <div role="cell" className="min-w-0">

@@ -1,0 +1,3608 @@
+<ENVELOPE>
+ <HEADER>
+  <VERSION>1</VERSION>
+  <STATUS>1</STATUS>
+ </HEADER>
+ <BODY>
+  <DESC>
+   <CMPINFO>
+    <COMPANY>0</COMPANY>
+    <GROUP>0</GROUP>
+    <LEDGER>0</LEDGER>
+    <COSTCATEGORY>0</COSTCATEGORY>
+    <COSTCENTRE>0</COSTCENTRE>
+    <GODOWN>0</GODOWN>
+    <STOCKGROUP>0</STOCKGROUP>
+    <STOCKCATEGORY>0</STOCKCATEGORY>
+    <STOCKITEM>0</STOCKITEM>
+    <VOUCHERTYPE>0</VOUCHERTYPE>
+    <CURRENCY>0</CURRENCY>
+    <UNIT>0</UNIT>
+    <BUDGET>0</BUDGET>
+    <CLIENTRULE>0</CLIENTRULE>
+    <SERVERRULE>0</SERVERRULE>
+    <STATE>0</STATE>
+    <TDSRATE>0</TDSRATE>
+    <TAXCLASSIFICATION>0</TAXCLASSIFICATION>
+    <STCATEGORY>0</STCATEGORY>
+    <DEDUCTEETYPE>0</DEDUCTEETYPE>
+    <ATTENDANCETYPE>0</ATTENDANCETYPE>
+    <FBTCATEGORY>0</FBTCATEGORY>
+    <FBTASSESSEETYPE>0</FBTASSESSEETYPE>
+    <TARIFFCLASSIFICATION>0</TARIFFCLASSIFICATION>
+    <EXCISEDUTYCLASSIFICATION>0</EXCISEDUTYCLASSIFICATION>
+    <SERIALNUMBER>0</SERIALNUMBER>
+    <ADJUSTMENTCLASSIFICATION>0</ADJUSTMENTCLASSIFICATION>
+    <INCOMETAXSLAB>0</INCOMETAXSLAB>
+    <INCOMETAXCLASSIFICATION>0</INCOMETAXCLASSIFICATION>
+    <LBTCLASSIFICATION>0</LBTCLASSIFICATION>
+    <TAXUNIT>0</TAXUNIT>
+    <RETURNMASTER>0</RETURNMASTER>
+    <GSTCLASSIFICATION>0</GSTCLASSIFICATION>
+    <VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>
+    <VOUCHER>0</VOUCHER>
+   </CMPINFO>
+  </DESC>
+  <DATA>
+   <COLLECTION ISMSTDEPTYPE="Yes" MSTDEPTYPE="8">
+    <LEDGER NAME="20 Microns Nano Minerals Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 15312</ALTERID>
+     <MASTERID TYPE="Number"> 5753</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>20 Microns Nano Minerals Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="86ten Chemicals" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9183</ALTERID>
+     <MASTERID TYPE="Number"> 746</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>86ten Chemicals</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Aarna Stationery Product" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4563</ALTERID>
+     <MASTERID TYPE="Number"> 2334</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Aarna Stationery Product</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Abc Chemicals Pvt. Ltd." RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 10946</ALTERID>
+     <MASTERID TYPE="Number"> 4349</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Abc Chemicals Pvt. Ltd.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ab Impex" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2351</ALTERID>
+     <MASTERID TYPE="Number"> 1876</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ab Impex</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="ACPL" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18295</ALTERID>
+     <MASTERID TYPE="Number"> 7882</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>ACPL</NAME>
+       <NAME>Kuldevi Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Activeman Specialities Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4172</ALTERID>
+     <MASTERID TYPE="Number"> 2100</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Activeman Specialities Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Adi Grafix" RESERVEDNAME="">
+     <PARENT TYPE="String">S. C For Promotion</PARENT>
+     <ALTERID TYPE="Number"> 9299</ALTERID>
+     <MASTERID TYPE="Number"> 4006</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Adi Grafix</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Adorn Glass" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9875</ALTERID>
+     <MASTERID TYPE="Number"> 4028</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Adorn Glass</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Advanced Industrial Micro Systems" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 4168</ALTERID>
+     <MASTERID TYPE="Number"> 2095</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Advanced Industrial Micro Systems</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Advance Mechanicals" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9920</ALTERID>
+     <MASTERID TYPE="Number"> 4064</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Advance Mechanicals</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Aggarwal Carring Corporation" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18649</ALTERID>
+     <MASTERID TYPE="Number"> 2788</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Aggarwal Carring Corporation</NAME>
+       <NAME>Kumar General Transporter</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ag Poly Packs Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15301</ALTERID>
+     <MASTERID TYPE="Number"> 7470</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ag Poly Packs Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="A.G. Synergy Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5342</ALTERID>
+     <MASTERID TYPE="Number"> 2804</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>A.G. Synergy Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Airtech Cooling Process Pvt. Ltd." RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 720</ALTERID>
+     <MASTERID TYPE="Number"> 493</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Airtech Cooling Process Pvt. Ltd.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ak Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 11595</ALTERID>
+     <MASTERID TYPE="Number"> 484</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ak Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="All Things Flair Llp" RESERVEDNAME="">
+     <PARENT TYPE="String">S. C For Promotion</PARENT>
+     <ALTERID TYPE="Number"> 9300</ALTERID>
+     <MASTERID TYPE="Number"> 4007</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>All Things Flair Llp</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Amkay Technocraft" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 1243</ALTERID>
+     <MASTERID TYPE="Number"> 518</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Amkay Technocraft</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Amp Pearl Pigment Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 10306</ALTERID>
+     <MASTERID TYPE="Number"> 4287</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Amp Pearl Pigment Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Amritsar Printing Press" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4095</ALTERID>
+     <MASTERID TYPE="Number"> 2034</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Amritsar Printing Press</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Anroe Printex Solutions Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 661</ALTERID>
+     <MASTERID TYPE="Number"> 458</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Anroe Printex Solutions Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Aplay Creation" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C Under MSME</PARENT>
+     <ALTERID TYPE="Number"> 4743</ALTERID>
+     <MASTERID TYPE="Number"> 2439</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Aplay Creation</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Aplay Creation (HR)" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 11267</ALTERID>
+     <MASTERID TYPE="Number"> 4390</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Aplay Creation (HR)</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Apna Timetech Pvt. Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 712</ALTERID>
+     <MASTERID TYPE="Number"> 510</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Apna Timetech Pvt. Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Apt Technologies" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 4885</ALTERID>
+     <MASTERID TYPE="Number"> 2448</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Apt Technologies</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Arbro Pharmaceuticals Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 8754</ALTERID>
+     <MASTERID TYPE="Number"> 3698</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Arbro Pharmaceuticals Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Arihant Innochem Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 12114</ALTERID>
+     <MASTERID TYPE="Number"> 4950</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Arihant Innochem Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ark Corporation" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15320</ALTERID>
+     <MASTERID TYPE="Number"> 7482</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ark Corporation</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="A R RESEARCH LAB" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 676</ALTERID>
+     <MASTERID TYPE="Number"> 488</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>A R RESEARCH LAB</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ashish" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 622</ALTERID>
+     <MASTERID TYPE="Number"> 447</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ashish</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ashoka Chemical India" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9162</ALTERID>
+     <MASTERID TYPE="Number"> 3957</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ashoka Chemical India</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ask Trading" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2519</ALTERID>
+     <MASTERID TYPE="Number"> 1995</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ask Trading</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Atc Logistical Solutions Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 17863</ALTERID>
+     <MASTERID TYPE="Number"> 7712</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Atc Logistical Solutions Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="ATC Transport" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18335</ALTERID>
+     <MASTERID TYPE="Number"> 2910</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>ATC Transport</NAME>
+       <NAME>Sutapa Enterprises Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="ATUL ENGINEERING" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 18199</ALTERID>
+     <MASTERID TYPE="Number"> 7832</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>ATUL ENGINEERING</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Baba Logistics" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18332</ALTERID>
+     <MASTERID TYPE="Number"> 5769</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Baba Logistics</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bajaj Rubber Company Pvt. Ltd." RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2521</ALTERID>
+     <MASTERID TYPE="Number"> 1998</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bajaj Rubber Company Pvt. Ltd.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bajaj Rubber Co. (P) Ltd. HR" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5339</ALTERID>
+     <MASTERID TYPE="Number"> 2799</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bajaj Rubber Co. (P) Ltd. HR</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bajrang Sales" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 1025</ALTERID>
+     <MASTERID TYPE="Number"> 730</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bajrang Sales</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="BALAJI ENTERPRISES" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5470</ALTERID>
+     <MASTERID TYPE="Number"> 2870</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>BALAJI ENTERPRISES</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Balaji Plastics" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9921</ALTERID>
+     <MASTERID TYPE="Number"> 4068</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Balaji Plastics</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ballman Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14040</ALTERID>
+     <MASTERID TYPE="Number"> 5750</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ballman Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Berlina Flex Printers" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 10279</ALTERID>
+     <MASTERID TYPE="Number"> 4261</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Berlina Flex Printers</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bhagwan Dass &amp; Co" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13848</ALTERID>
+     <MASTERID TYPE="Number"> 5646</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bhagwan Dass &amp; Co</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bhagwati Print &amp; Packaging" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13891</ALTERID>
+     <MASTERID TYPE="Number"> 5678</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bhagwati Print &amp; Packaging</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bhandari Electrical &amp; Power Control" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 8751</ALTERID>
+     <MASTERID TYPE="Number"> 3695</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bhandari Electrical &amp; Power Control</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bharat Machinary Store" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 17841</ALTERID>
+     <MASTERID TYPE="Number"> 7706</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bharat Machinary Store</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bhasin Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 10927</ALTERID>
+     <MASTERID TYPE="Number"> 4338</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bhasin Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bhawna Plastics" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 4985</ALTERID>
+     <MASTERID TYPE="Number"> 2643</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bhawna Plastics</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bio-Nova" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15126</ALTERID>
+     <MASTERID TYPE="Number"> 7365</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bio-Nova</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Blister Packing Mfg Co" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2543</ALTERID>
+     <MASTERID TYPE="Number"> 2019</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Blister Packing Mfg Co</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bombay Plastic Works" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 18165</ALTERID>
+     <MASTERID TYPE="Number"> 2031</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bombay Plastic Works</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Bpmc Global Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14028</ALTERID>
+     <MASTERID TYPE="Number"> 2824</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Bpmc Global Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Brc Road Carrier" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18382</ALTERID>
+     <MASTERID TYPE="Number"> 2786</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Brc Road Carrier</NAME>
+       <NAME>U.R.S Transporter</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="B S Cheminova" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15545</ALTERID>
+     <MASTERID TYPE="Number"> 7662</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>B S Cheminova</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Caajib Ecom Services DL" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 10129</ALTERID>
+     <MASTERID TYPE="Number"> 4175</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Caajib Ecom Services DL</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Cellotape Industries Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 15091</ALTERID>
+     <MASTERID TYPE="Number"> 7334</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Cellotape Industries Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Chaman Lal Bajaj and Sons" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9931</ALTERID>
+     <MASTERID TYPE="Number"> 4076</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Chaman Lal Bajaj and Sons</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Chaudhary Glasspack Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C Under MSME</PARENT>
+     <ALTERID TYPE="Number"> 1051</ALTERID>
+     <MASTERID TYPE="Number"> 754</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Chaudhary Glasspack Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Chaudhary Trading Co" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 13996</ALTERID>
+     <MASTERID TYPE="Number"> 5726</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Chaudhary Trading Co</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Chemico Health and Beauty India Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5384</ALTERID>
+     <MASTERID TYPE="Number"> 2856</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Chemico Health and Beauty India Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Choudhary &amp; Company" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2425</ALTERID>
+     <MASTERID TYPE="Number"> 1912</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Choudhary &amp; Company</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Cilantro Chemicals Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14033</ALTERID>
+     <MASTERID TYPE="Number"> 5742</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Cilantro Chemicals Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="City Power Engineering" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 636</ALTERID>
+     <MASTERID TYPE="Number"> 461</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>City Power Engineering</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="C J S Specialty Chemicals Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5382</ALTERID>
+     <MASTERID TYPE="Number"> 2853</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>C J S Specialty Chemicals Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Concept Creation" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9938</ALTERID>
+     <MASTERID TYPE="Number"> 4083</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Concept Creation</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Confiance Life Sciences Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9148</ALTERID>
+     <MASTERID TYPE="Number"> 3948</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Confiance Life Sciences Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Controls Instruments India" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13940</ALTERID>
+     <MASTERID TYPE="Number"> 454</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Controls Instruments India</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Cospack India" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4191</ALTERID>
+     <MASTERID TYPE="Number"> 2121</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Cospack India</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Crescent Engineering Corporation" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 11619</ALTERID>
+     <MASTERID TYPE="Number"> 460</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Crescent Engineering Corporation</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Datacoding Concepts" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 4181</ALTERID>
+     <MASTERID TYPE="Number"> 2112</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Datacoding Concepts</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Delhi Tools &amp; Hardware Store" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 222</ALTERID>
+     <MASTERID TYPE="Number"> 219</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Delhi Tools &amp; Hardware Store</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Deltapure Technologies (India) Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 624</ALTERID>
+     <MASTERID TYPE="Number"> 449</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Deltapure Technologies (India) Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Dev Logistics" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18383</ALTERID>
+     <MASTERID TYPE="Number"> 2420</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Dev Logistics</NAME>
+       <NAME>Jay Ent Transporter</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Dharam Pal Gupta &amp; Bros" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18711</ALTERID>
+     <MASTERID TYPE="Number"> 8127</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Dharam Pal Gupta &amp; Bros</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Digipress Ai Digital Solutions" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13956</ALTERID>
+     <MASTERID TYPE="Number"> 5713</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Digipress Ai Digital Solutions</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Dine International" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 8932</ALTERID>
+     <MASTERID TYPE="Number"> 3783</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Dine International</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Discovery Scientific Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13844</ALTERID>
+     <MASTERID TYPE="Number"> 516</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Discovery Scientific Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="D.K. Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4150</ALTERID>
+     <MASTERID TYPE="Number"> 2076</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>D.K. Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Dk Speciality Chemicals" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14031</ALTERID>
+     <MASTERID TYPE="Number"> 5739</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Dk Speciality Chemicals</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="D. L. &amp; Co." RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 10165</ALTERID>
+     <MASTERID TYPE="Number"> 4207</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>D. L. &amp; Co.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Drax Trading Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 1260</ALTERID>
+     <MASTERID TYPE="Number"> 948</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Drax Trading Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Durga Saintory Store" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 975</ALTERID>
+     <MASTERID TYPE="Number"> 688</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Durga Saintory Store</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ekta Furniture" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13814</ALTERID>
+     <MASTERID TYPE="Number"> 1967</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ekta Furniture</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Elite  Rubber Chemicals" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15347</ALTERID>
+     <MASTERID TYPE="Number"> 7493</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Elite  Rubber Chemicals</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Excellent Vikas Associates" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 1043</ALTERID>
+     <MASTERID TYPE="Number"> 743</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Excellent Vikas Associates</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Focustech Solutions" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 5140</ALTERID>
+     <MASTERID TYPE="Number"> 2763</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Focustech Solutions</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Fragrance Specialities" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13731</ALTERID>
+     <MASTERID TYPE="Number"> 5612</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Fragrance Specialities</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Fragrances Valley" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15572</ALTERID>
+     <MASTERID TYPE="Number"> 7680</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Fragrances Valley</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Friends Chemical" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 915</ALTERID>
+     <MASTERID TYPE="Number"> 642</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Friends Chemical</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Garg Electrical" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 8749</ALTERID>
+     <MASTERID TYPE="Number"> 3693</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Garg Electrical</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Garud Products Inc." RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2523</ALTERID>
+     <MASTERID TYPE="Number"> 1911</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Garud Products Inc.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Global Sourcing" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 2140</ALTERID>
+     <MASTERID TYPE="Number"> 1693</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Global Sourcing</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="GLOBAL TRAVEL PARTNER" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 7938</ALTERID>
+     <MASTERID TYPE="Number"> 2990</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>GLOBAL TRAVEL PARTNER</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Gogia Fragrances Pvt. Ltd." RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13719</ALTERID>
+     <MASTERID TYPE="Number"> 5613</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Gogia Fragrances Pvt. Ltd.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Govindam Holographic Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 8728</ALTERID>
+     <MASTERID TYPE="Number"> 3675</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Govindam Holographic Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Great India Roadways" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18244</ALTERID>
+     <MASTERID TYPE="Number"> 2911</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Great India Roadways</NAME>
+       <NAME>Mamun Enter Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Grover Petro Chem" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14038</ALTERID>
+     <MASTERID TYPE="Number"> 5747</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Grover Petro Chem</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Gseven Computer Business Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 10278</ALTERID>
+     <MASTERID TYPE="Number"> 4260</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Gseven Computer Business Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Gujrat Uttrakhand parcel service" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18518</ALTERID>
+     <MASTERID TYPE="Number"> 2787</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Gujrat Uttrakhand parcel service</NAME>
+       <NAME>sanchita transport</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Gupta Brothers" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 14172</ALTERID>
+     <MASTERID TYPE="Number"> 5816</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Gupta Brothers</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Gupta Electricals" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14166</ALTERID>
+     <MASTERID TYPE="Number"> 5809</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Gupta Electricals</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Gupta Trading Co." RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 723</ALTERID>
+     <MASTERID TYPE="Number"> 511</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Gupta Trading Co.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Gurukripa Cargo Movers" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18599</ALTERID>
+     <MASTERID TYPE="Number"> 2953</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Gurukripa Cargo Movers</NAME>
+       <NAME>Vardhman Trade Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Guru Kripa Electronics" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 11262</ALTERID>
+     <MASTERID TYPE="Number"> 4384</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Guru Kripa Electronics</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Guru Teg Bahadur Printing Press" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5370</ALTERID>
+     <MASTERID TYPE="Number"> 2106</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Guru Teg Bahadur Printing Press</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Hare Krishana Electrical Services" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 8750</ALTERID>
+     <MASTERID TYPE="Number"> 3694</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Hare Krishana Electrical Services</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Hariom Retail Pvt.Ltd." RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18540</ALTERID>
+     <MASTERID TYPE="Number"> 8033</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Hariom Retail Pvt.Ltd.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="HDS Security Pvt. Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 627</ALTERID>
+     <MASTERID TYPE="Number"> 452</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>HDS Security Pvt. Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Hingalaj Krupa Trading Copmany" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13822</ALTERID>
+     <MASTERID TYPE="Number"> 5636</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Hingalaj Krupa Trading Copmany</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Hi-Tech Enterpries" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 10127</ALTERID>
+     <MASTERID TYPE="Number"> 4174</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Hi-Tech Enterpries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="H.N Chauhan &amp; Sons" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15401</ALTERID>
+     <MASTERID TYPE="Number"> 7530</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>H.N Chauhan &amp; Sons</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Honest Beauty Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 14050</ALTERID>
+     <MASTERID TYPE="Number"> 5763</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Honest Beauty Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Hts Chem Industries Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4930</ALTERID>
+     <MASTERID TYPE="Number"> 2593</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Hts Chem Industries Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Icici Lombard General Insurance Co Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 13648</ALTERID>
+     <MASTERID TYPE="Number"> 5561</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Icici Lombard General Insurance Co Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Idcc Global Chem Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 12619</ALTERID>
+     <MASTERID TYPE="Number"> 5415</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Idcc Global Chem Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="I.J. Paint Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 2484</ALTERID>
+     <MASTERID TYPE="Number"> 1968</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>I.J. Paint Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Imcd  India Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5380</ALTERID>
+     <MASTERID TYPE="Number"> 2850</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Imcd  India Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="INDIA KING TRANSPORT SERVICE" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18341</ALTERID>
+     <MASTERID TYPE="Number"> 2912</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>INDIA KING TRANSPORT SERVICE</NAME>
+       <NAME>SHRI SALASAR TRANS</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Inland Freight Express" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 15282</ALTERID>
+     <MASTERID TYPE="Number"> 3714</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Inland Freight Express</NAME>
+       <NAME>AK Ent Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Innthink Technologies Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15509</ALTERID>
+     <MASTERID TYPE="Number"> 7629</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Innthink Technologies Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Intense Packers" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9909</ALTERID>
+     <MASTERID TYPE="Number"> 4058</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Intense Packers</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="International Packaging" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4155</ALTERID>
+     <MASTERID TYPE="Number"> 2083</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>International Packaging</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Issacc Cosmocare" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 8753</ALTERID>
+     <MASTERID TYPE="Number"> 3697</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Issacc Cosmocare</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Jagdamba Paints &amp; Mixture" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9929</ALTERID>
+     <MASTERID TYPE="Number"> 4075</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Jagdamba Paints &amp; Mixture</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Jain Trading Company" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 670</ALTERID>
+     <MASTERID TYPE="Number"> 480</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Jain Trading Company</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Javico Lifestyle Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 210</ALTERID>
+     <MASTERID TYPE="Number"> 206</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Javico Lifestyle Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Jehlum Roadlines Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18519</ALTERID>
+     <MASTERID TYPE="Number"> 2965</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Jehlum Roadlines Private Limited</NAME>
+       <NAME>R T Agen Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="J.K. Sales Corporation" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 9024</ALTERID>
+     <MASTERID TYPE="Number"> 3848</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>J.K. Sales Corporation</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Jmjw Travels" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 15094</ALTERID>
+     <MASTERID TYPE="Number"> 7337</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Jmjw Travels</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Jodhpur Marwar Goods Carrier" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18381</ALTERID>
+     <MASTERID TYPE="Number"> 2762</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Jodhpur Marwar Goods Carrier</NAME>
+       <NAME>ROSHINI BEAUTY TRANS</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kamal Oil Company" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 8910</ALTERID>
+     <MASTERID TYPE="Number"> 3778</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kamal Oil Company</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kamini Jain" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 235</ALTERID>
+     <MASTERID TYPE="Number"> 224</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kamini Jain</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kanha Printpack Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9974</ALTERID>
+     <MASTERID TYPE="Number"> 4114</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kanha Printpack Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Karan Singh Electricals" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 678</ALTERID>
+     <MASTERID TYPE="Number"> 490</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Karan Singh Electricals</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kasa India Lifesciences" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C Under MSME</PARENT>
+     <ALTERID TYPE="Number"> 4892</ALTERID>
+     <MASTERID TYPE="Number"> 2551</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kasa India Lifesciences</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kasa India Lifesciences- Mh" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 18179</ALTERID>
+     <MASTERID TYPE="Number"> 7821</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kasa India Lifesciences- Mh</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kashmir Metal Store" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 1250</ALTERID>
+     <MASTERID TYPE="Number"> 941</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kashmir Metal Store</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kavita Patel Makeover" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 10593</ALTERID>
+     <MASTERID TYPE="Number"> 4300</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kavita Patel Makeover</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="K.D.Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15379</ALTERID>
+     <MASTERID TYPE="Number"> 7515</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>K.D.Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kent Ro Systems Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18115</ALTERID>
+     <MASTERID TYPE="Number"> 7774</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kent Ro Systems Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Khetwani Forex Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13941</ALTERID>
+     <MASTERID TYPE="Number"> 5706</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Khetwani Forex Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kip Chemicals Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9157</ALTERID>
+     <MASTERID TYPE="Number"> 3954</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kip Chemicals Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kitcare Equipments" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 716</ALTERID>
+     <MASTERID TYPE="Number"> 487</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kitcare Equipments</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kk India Petroleum Specialities Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15546</ALTERID>
+     <MASTERID TYPE="Number"> 7665</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kk India Petroleum Specialities Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="K L Organic" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14178</ALTERID>
+     <MASTERID TYPE="Number"> 5821</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>K L Organic</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Knock Out Security Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15378</ALTERID>
+     <MASTERID TYPE="Number"> 7513</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Knock Out Security Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kohi Plywood Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 634</ALTERID>
+     <MASTERID TYPE="Number"> 459</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kohi Plywood Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kss Associates" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18521</ALTERID>
+     <MASTERID TYPE="Number"> 3036</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kss Associates</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Kumar Printers" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 12610</ALTERID>
+     <MASTERID TYPE="Number"> 5408</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Kumar Printers</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="LALJI ADVOCATES" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 12595</ALTERID>
+     <MASTERID TYPE="Number"> 5395</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>LALJI ADVOCATES</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Lasco Chemie Pvt. Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5362</ALTERID>
+     <MASTERID TYPE="Number"> 2832</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Lasco Chemie Pvt. Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Le Fric Beaute Care Llp" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2542</ALTERID>
+     <MASTERID TYPE="Number"> 2017</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Le Fric Beaute Care Llp</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Lei Register India Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18309</ALTERID>
+     <MASTERID TYPE="Number"> 7891</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Lei Register India Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Link Hr Solution Pvt.Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 683</ALTERID>
+     <MASTERID TYPE="Number"> 495</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Link Hr Solution Pvt.Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Lucky Baba Transport" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18354</ALTERID>
+     <MASTERID TYPE="Number"> 2692</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Lucky Baba Transport</NAME>
+       <NAME>V.K Sales Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Luxepack India Pvt Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 10277</ALTERID>
+     <MASTERID TYPE="Number"> 4259</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Luxepack India Pvt Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Maa Sharda Carriers" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18336</ALTERID>
+     <MASTERID TYPE="Number"> 7362</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Maa Sharda Carriers</NAME>
+       <NAME>Global Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Madhur Utsav &amp; Co." RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 4921</ALTERID>
+     <MASTERID TYPE="Number"> 2096</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Madhur Utsav &amp; Co.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Maintenanceya" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 9023</ALTERID>
+     <MASTERID TYPE="Number"> 3847</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Maintenanceya</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Makeup. Com Color Cosmetics" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18732</ALTERID>
+     <MASTERID TYPE="Number"> 8137</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Makeup. Com Color Cosmetics</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Manish Electrico" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 4883</ALTERID>
+     <MASTERID TYPE="Number"> 457</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Manish Electrico</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Mano Packaging Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18127</ALTERID>
+     <MASTERID TYPE="Number"> 7783</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Mano Packaging Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Manya International" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 11596</ALTERID>
+     <MASTERID TYPE="Number"> 486</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Manya International</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Marks Ion Exchange" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 631</ALTERID>
+     <MASTERID TYPE="Number"> 456</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Marks Ion Exchange</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Mata Transport Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18236</ALTERID>
+     <MASTERID TYPE="Number"> 2434</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Mata Transport Private Limited</NAME>
+       <NAME>Shrishti Fash Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Maxcomm India Private Limited-DL" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C Under MSME</PARENT>
+     <ALTERID TYPE="Number"> 15562</ALTERID>
+     <MASTERID TYPE="Number"> 644</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Maxcomm India Private Limited-DL</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Maxcomm India Private Limited UP" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 13702</ALTERID>
+     <MASTERID TYPE="Number"> 5604</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Maxcomm India Private Limited UP</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Medhansh Pack" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 13957</ALTERID>
+     <MASTERID TYPE="Number"> 3982</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Medhansh Pack</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Mehta Interstate Transport Corporation" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 18739</ALTERID>
+     <MASTERID TYPE="Number"> 2826</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Mehta Interstate Transport Corporation</NAME>
+       <NAME>Nav Bharat Trans</NAME>
+       <NAME>Tripathi Trader Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="METATECH PROCESS SOLUTION" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 15169</ALTERID>
+     <MASTERID TYPE="Number"> 2874</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>METATECH PROCESS SOLUTION</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M.K. Transport Company" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18353</ALTERID>
+     <MASTERID TYPE="Number"> 439</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M.K. Transport Company</NAME>
+       <NAME>Choice Beauty Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M L Plastic Products" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 10561</ALTERID>
+     <MASTERID TYPE="Number"> 4299</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M L Plastic Products</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Mobelchem Specialty Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15110</ALTERID>
+     <MASTERID TYPE="Number"> 7348</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Mobelchem Specialty Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Modern Printers" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C Under MSME</PARENT>
+     <ALTERID TYPE="Number"> 4924</ALTERID>
+     <MASTERID TYPE="Number"> 2586</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Modern Printers</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Mohit Chemicals" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18712</ALTERID>
+     <MASTERID TYPE="Number"> 8129</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Mohit Chemicals</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Mohit Paint &amp; H/w" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 1058</ALTERID>
+     <MASTERID TYPE="Number"> 759</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Mohit Paint &amp; H/w</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Moksha Power and Water Solution" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 10305</ALTERID>
+     <MASTERID TYPE="Number"> 4285</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Moksha Power and Water Solution</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Mor Medics Science &amp; Technologies" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 8752</ALTERID>
+     <MASTERID TYPE="Number"> 3696</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Mor Medics Science &amp; Technologies</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M/s Amber Banquets" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 12550</ALTERID>
+     <MASTERID TYPE="Number"> 5378</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M/s Amber Banquets</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M/s Digital Print" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18308</ALTERID>
+     <MASTERID TYPE="Number"> 7890</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M/s Digital Print</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M/s Info Edge India Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 13675</ALTERID>
+     <MASTERID TYPE="Number"> 5577</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M/s Info Edge India Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M/s Prisha Tubes Pvt. Ltd." RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4151</ALTERID>
+     <MASTERID TYPE="Number"> 770</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M/s Prisha Tubes Pvt. Ltd.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M/s. R and  R Inc" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 4932</ALTERID>
+     <MASTERID TYPE="Number"> 2596</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M/s. R and  R Inc</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M/s Taj Glass Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18112</ALTERID>
+     <MASTERID TYPE="Number"> 7772</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M/s Taj Glass Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M/s Taurus Packging Pvt.Ltd." RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 7852</ALTERID>
+     <MASTERID TYPE="Number"> 2973</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M/s Taurus Packging Pvt.Ltd.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M/s Techvos India" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 724</ALTERID>
+     <MASTERID TYPE="Number"> 519</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M/s Techvos India</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="M/s Ultra International Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18334</ALTERID>
+     <MASTERID TYPE="Number"> 7904</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>M/s Ultra International Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Mukta Plastic Products" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13882</ALTERID>
+     <MASTERID TYPE="Number"> 5672</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Mukta Plastic Products</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Munchun Das" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 17843</ALTERID>
+     <MASTERID TYPE="Number"> 7711</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Munchun Das</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Nagpur Delhi Transport Co Pvt Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 13929</ALTERID>
+     <MASTERID TYPE="Number"> 2433</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Nagpur Delhi Transport Co Pvt Ltd</NAME>
+       <NAME>Maa Bhawani Trasn New</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Nagpur Golden Transpoprt Pvt Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 4679</ALTERID>
+     <MASTERID TYPE="Number"> 667</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Nagpur Golden Transpoprt Pvt Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Nailora Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 13721</ALTERID>
+     <MASTERID TYPE="Number"> 5615</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Nailora Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Naksh India Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18064</ALTERID>
+     <MASTERID TYPE="Number"> 7747</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Naksh India Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Nano Tech Chemical Brothers (P) Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15595</ALTERID>
+     <MASTERID TYPE="Number"> 7696</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Nano Tech Chemical Brothers (P) Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="NathuLal" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 14142</ALTERID>
+     <MASTERID TYPE="Number"> 5777</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>NathuLal</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="National Oil Corporation" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 1053</ALTERID>
+     <MASTERID TYPE="Number"> 756</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>National Oil Corporation</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Nature-Tech Ingredients Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 8755</ALTERID>
+     <MASTERID TYPE="Number"> 3699</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Nature-Tech Ingredients Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Navyug Glass Company" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 15112</ALTERID>
+     <MASTERID TYPE="Number"> 7350</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Navyug Glass Company</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Neelkanth Mine Chem" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15373</ALTERID>
+     <MASTERID TYPE="Number"> 7508</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Neelkanth Mine Chem</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Nem Chand Jain &amp; Sons" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14162</ALTERID>
+     <MASTERID TYPE="Number"> 5804</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Nem Chand Jain &amp; Sons</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Nitco Logistics Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 15338</ALTERID>
+     <MASTERID TYPE="Number"> 7487</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Nitco Logistics Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Okara Roadways (Regd)" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 15341</ALTERID>
+     <MASTERID TYPE="Number"> 7488</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Okara Roadways (Regd)</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Olor Perfumery" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13709</ALTERID>
+     <MASTERID TYPE="Number"> 5611</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Olor Perfumery</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="OMNIGROWTH SOLUTIONS LLP" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 10941</ALTERID>
+     <MASTERID TYPE="Number"> 4346</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>OMNIGROWTH SOLUTIONS LLP</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Om Shiv Transport Co." RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18650</ALTERID>
+     <MASTERID TYPE="Number"> 3766</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Om Shiv Transport Co.</NAME>
+       <NAME>RADHA KRISHAN Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Om Shri Sai Traders" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13708</ALTERID>
+     <MASTERID TYPE="Number"> 2094</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Om Shri Sai Traders</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Orgachemie Agencies" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 15063</ALTERID>
+     <MASTERID TYPE="Number"> 7311</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Orgachemie Agencies</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Owebest India LLP" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 13676</ALTERID>
+     <MASTERID TYPE="Number"> 5578</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Owebest India LLP</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Pal Svam Power Solutions Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 4183</ALTERID>
+     <MASTERID TYPE="Number"> 2115</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Pal Svam Power Solutions Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Pardeep Dyes &amp; Chemicals Co" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 14189</ALTERID>
+     <MASTERID TYPE="Number"> 5829</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Pardeep Dyes &amp; Chemicals Co</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Parkash Furniture House" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18690</ALTERID>
+     <MASTERID TYPE="Number"> 8102</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Parkash Furniture House</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Pashupati Road Carrier (P) Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18524</ALTERID>
+     <MASTERID TYPE="Number"> 2865</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Pashupati Road Carrier (P) Ltd</NAME>
+       <NAME>Aaradhya Enter Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Pci Pest Control Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 11285</ALTERID>
+     <MASTERID TYPE="Number"> 4406</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Pci Pest Control Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Perfect Solutions" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C Under MSME</PARENT>
+     <ALTERID TYPE="Number"> 2526</ALTERID>
+     <MASTERID TYPE="Number"> 749</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Perfect Solutions</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Pharmadocx" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 662</ALTERID>
+     <MASTERID TYPE="Number"> 472</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Pharmadocx</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Pioma Chemicals" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15111</ALTERID>
+     <MASTERID TYPE="Number"> 7349</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Pioma Chemicals</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Plastikrafts" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 13646</ALTERID>
+     <MASTERID TYPE="Number"> 4047</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Plastikrafts</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="P.M. Plastopet" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18515</ALTERID>
+     <MASTERID TYPE="Number"> 8017</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>P.M. Plastopet</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Pocket Smhrt Tech Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 11286</ALTERID>
+     <MASTERID TYPE="Number"> 4407</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Pocket Smhrt Tech Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="POOJA INDUSTRIES" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 6562</ALTERID>
+     <MASTERID TYPE="Number"> 2921</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>POOJA INDUSTRIES</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="P.P. Roadlines" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 15337</ALTERID>
+     <MASTERID TYPE="Number"> 7486</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>P.P. Roadlines</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Pragati Road Carriers" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18330</ALTERID>
+     <MASTERID TYPE="Number"> 7479</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Pragati Road Carriers</NAME>
+       <NAME>PREM RAJ TRAN</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Premium Plastic Products" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5347</ALTERID>
+     <MASTERID TYPE="Number"> 2812</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Premium Plastic Products</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Priz Print" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2528</ALTERID>
+     <MASTERID TYPE="Number"> 2005</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Priz Print</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="P.S. Aromatics" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15383</ALTERID>
+     <MASTERID TYPE="Number"> 7519</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>P.S. Aromatics</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ptl Tourism Transport Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 13730</ALTERID>
+     <MASTERID TYPE="Number"> 5625</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ptl Tourism Transport Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Punj Packers" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9150</ALTERID>
+     <MASTERID TYPE="Number"> 3950</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Punj Packers</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Radian Chemical Products Pvt Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 12733</ALTERID>
+     <MASTERID TYPE="Number"> 5525</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Radian Chemical Products Pvt Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Raj Plastics" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 15167</ALTERID>
+     <MASTERID TYPE="Number"> 935</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Raj Plastics</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Raksh Bio Science Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15344</ALTERID>
+     <MASTERID TYPE="Number"> 7491</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Raksh Bio Science Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ram Murti Steels" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 5052</ALTERID>
+     <MASTERID TYPE="Number"> 2689</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ram Murti Steels</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ranyal Travel" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 5334</ALTERID>
+     <MASTERID TYPE="Number"> 2792</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ranyal Travel</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Rashi Knitwears" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18607</ALTERID>
+     <MASTERID TYPE="Number"> 4178</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Rashi Knitwears</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Rath Infotech and Web Solutions Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15412</ALTERID>
+     <MASTERID TYPE="Number"> 7536</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Rath Infotech and Web Solutions Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Rational Business Corporation Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18101</ALTERID>
+     <MASTERID TYPE="Number"> 7761</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Rational Business Corporation Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="RBN PACKAGINGS" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 6578</ALTERID>
+     <MASTERID TYPE="Number"> 2934</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>RBN PACKAGINGS</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Reliable Packaging" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 14135</ALTERID>
+     <MASTERID TYPE="Number"> 5797</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Reliable Packaging</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Reliable Technopackaging Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4099</ALTERID>
+     <MASTERID TYPE="Number"> 2039</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Reliable Technopackaging Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ritika Plastic Company" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 1000</ALTERID>
+     <MASTERID TYPE="Number"> 713</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ritika Plastic Company</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="RITU JOB CONSULTANCY" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 18201</ALTERID>
+     <MASTERID TYPE="Number"> 7833</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>RITU JOB CONSULTANCY</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="R K &amp; Associates" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 18288</ALTERID>
+     <MASTERID TYPE="Number"> 7880</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>R K &amp; Associates</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="R.K. Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13866</ALTERID>
+     <MASTERID TYPE="Number"> 5656</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>R.K. Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="R.K.Pharma Machinery" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 9184</ALTERID>
+     <MASTERID TYPE="Number"> 2384</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>R.K.Pharma Machinery</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="R K Printers" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14022</ALTERID>
+     <MASTERID TYPE="Number"> 3970</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>R K Printers</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="R.L.Plastics" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5360</ALTERID>
+     <MASTERID TYPE="Number"> 2829</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>R.L.Plastics</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Rolex Lanolin Products Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18182</ALTERID>
+     <MASTERID TYPE="Number"> 7825</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Rolex Lanolin Products Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Rpgv India Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2427</ALTERID>
+     <MASTERID TYPE="Number"> 1915</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Rpgv India Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ruma Naturals Llp" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 8768</ALTERID>
+     <MASTERID TYPE="Number"> 3709</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ruma Naturals Llp</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Saheb Road Carriers" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 10211</ALTERID>
+     <MASTERID TYPE="Number"> 3446</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Saheb Road Carriers</NAME>
+       <NAME>Reliable Transpot</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Sahyadri Products" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 1239</ALTERID>
+     <MASTERID TYPE="Number"> 931</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Sahyadri Products</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Sain Stationery Mart" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 7937</ALTERID>
+     <MASTERID TYPE="Number"> 2989</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Sain Stationery Mart</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Samast Technologies Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 13894</ALTERID>
+     <MASTERID TYPE="Number"> 5681</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Samast Technologies Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="S B Aromatics" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13830</ALTERID>
+     <MASTERID TYPE="Number"> 5637</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>S B Aromatics</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Scope Specialities Llp" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18368</ALTERID>
+     <MASTERID TYPE="Number"> 7922</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Scope Specialities Llp</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Selmex Industries Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 2510</ALTERID>
+     <MASTERID TYPE="Number"> 1986</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Selmex Industries Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Selmex Industries Private Limited-HR" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 11618</ALTERID>
+     <MASTERID TYPE="Number"> 4483</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Selmex Industries Private Limited-HR</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Seven Seas Beauty Products" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 467</ALTERID>
+     <MASTERID TYPE="Number"> 355</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Seven Seas Beauty Products</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Seven Seas Beauty Products Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13655</ALTERID>
+     <MASTERID TYPE="Number"> 761</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Seven Seas Beauty Products Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="S G Plastic Works" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 8947</ALTERID>
+     <MASTERID TYPE="Number"> 3796</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>S G Plastic Works</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shakti Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4145</ALTERID>
+     <MASTERID TYPE="Number"> 2072</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shakti Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shanti Parivahan Company" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 13978</ALTERID>
+     <MASTERID TYPE="Number"> 5722</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shanti Parivahan Company</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="SHASHWAT PERFUMERS" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5427</ALTERID>
+     <MASTERID TYPE="Number"> 2866</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>SHASHWAT PERFUMERS</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Sherawat Transport Company" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14168</ALTERID>
+     <MASTERID TYPE="Number"> 5812</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Sherawat Transport Company</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shiva Advertising &amp;  Marketing" RESERVEDNAME="">
+     <PARENT TYPE="String">S. C For Promotion</PARENT>
+     <ALTERID TYPE="Number"> 18328</ALTERID>
+     <MASTERID TYPE="Number"> 7903</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shiva Advertising &amp;  Marketing</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shiva Brushes" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4913</ALTERID>
+     <MASTERID TYPE="Number"> 2575</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shiva Brushes</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shivam" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 15135</ALTERID>
+     <MASTERID TYPE="Number"> 7370</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shivam</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shiv Packaging" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 13000</ALTERID>
+     <MASTERID TYPE="Number"> 5549</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shiv Packaging</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shree Ji Graphics &amp; Printers" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5336</ALTERID>
+     <MASTERID TYPE="Number"> 2795</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shree Ji Graphics &amp; Printers</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shree Shyam Mobile Accessories" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18663</ALTERID>
+     <MASTERID TYPE="Number"> 8086</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shree Shyam Mobile Accessories</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shreya Cards" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2447</ALTERID>
+     <MASTERID TYPE="Number"> 1934</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shreya Cards</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shri Balaji Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5371</ALTERID>
+     <MASTERID TYPE="Number"> 2841</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shri Balaji Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shri Tirupati Packaging" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 15315</ALTERID>
+     <MASTERID TYPE="Number"> 5711</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shri Tirupati Packaging</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shri Vinayak Packaging Machine Pvt. Ltd." RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 10304</ALTERID>
+     <MASTERID TYPE="Number"> 4283</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shri Vinayak Packaging Machine Pvt. Ltd.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shubham Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 2429</ALTERID>
+     <MASTERID TYPE="Number"> 1918</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shubham Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Shubhankar Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18706</ALTERID>
+     <MASTERID TYPE="Number"> 8120</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Shubhankar Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Siddhant Pharma Chem" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15514</ALTERID>
+     <MASTERID TYPE="Number"> 7633</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Siddhant Pharma Chem</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Sk Industries (Delhi)" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 14136</ALTERID>
+     <MASTERID TYPE="Number"> 1901</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Sk Industries (Delhi)</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="S K Industries (Haryana)" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5373</ALTERID>
+     <MASTERID TYPE="Number"> 2842</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>S K Industries (Haryana)</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="S.K.Packer&apos;s" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 4180</ALTERID>
+     <MASTERID TYPE="Number"> 2110</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>S.K.Packer&apos;s</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Small Profit Trading Co" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4157</ALTERID>
+     <MASTERID TYPE="Number"> 2086</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Small Profit Trading Co</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Small Profit Trading Co. HR" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9912</ALTERID>
+     <MASTERID TYPE="Number"> 4059</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Small Profit Trading Co. HR</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="S.N. Traders" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 630</ALTERID>
+     <MASTERID TYPE="Number"> 455</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>S.N. Traders</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="S R Extrusions" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15405</ALTERID>
+     <MASTERID TYPE="Number"> 216</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>S R Extrusions</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Sri Om Trading" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9902</ALTERID>
+     <MASTERID TYPE="Number"> 4051</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Sri Om Trading</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="S.S.R.Logistic" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18597</ALTERID>
+     <MASTERID TYPE="Number"> 2942</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>S.S.R.Logistic</NAME>
+       <NAME>Kirti Enter Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Ssv Versachem Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C Under MSME</PARENT>
+     <ALTERID TYPE="Number"> 4906</ALTERID>
+     <MASTERID TYPE="Number"> 2566</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Ssv Versachem Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="S.S.Water Technologies" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 14149</ALTERID>
+     <MASTERID TYPE="Number"> 5798</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>S.S.Water Technologies</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Standard Chemicals" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15313</ALTERID>
+     <MASTERID TYPE="Number"> 7480</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Standard Chemicals</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Stell Fix Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 8743</ALTERID>
+     <MASTERID TYPE="Number"> 3687</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Stell Fix Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Subhash Chemical Industries Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 8940</ALTERID>
+     <MASTERID TYPE="Number"> 3790</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Subhash Chemical Industries Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Sudhir Solvents Pvt. Ltd." RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 4086</ALTERID>
+     <MASTERID TYPE="Number"> 2023</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Sudhir Solvents Pvt. Ltd.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Sunny Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 2139</ALTERID>
+     <MASTERID TYPE="Number"> 1692</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Sunny Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Super Dye Chem" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 11360</ALTERID>
+     <MASTERID TYPE="Number"> 4434</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Super Dye Chem</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Suraj Freight Carrier Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18665</ALTERID>
+     <MASTERID TYPE="Number"> 767</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Suraj Freight Carrier Private Limited</NAME>
+       <NAME>Amit Ent Transporters</NAME>
+       <NAME>Srivastav Gen St Trans</NAME>
+       <NAME>RP Trader Trans</NAME>
+       <NAME>Manoranjan Trans</NAME>
+       <NAME>Shriram Enter Trans</NAME>
+       <NAME>Mountain Trans</NAME>
+       <NAME>RPS Trans</NAME>
+       <NAME>Beauty Garden Trans</NAME>
+       <NAME>Sangeeta Trans</NAME>
+       <NAME>K.BROTHER TRAN</NAME>
+       <NAME>Ayush Ent Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="System Packaging P.Ltd." RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 18269</ALTERID>
+     <MASTERID TYPE="Number"> 7868</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>System Packaging P.Ltd.</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Tarun Plastic Products" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15390</ALTERID>
+     <MASTERID TYPE="Number"> 7521</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Tarun Plastic Products</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Tejas Enterprises Pvt Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 6120</ALTERID>
+     <MASTERID TYPE="Number"> 2879</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Tejas Enterprises Pvt Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="The Suraj Goods Carriers" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 18066</ALTERID>
+     <MASTERID TYPE="Number"> 2963</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>The Suraj Goods Carriers</NAME>
+       <NAME>Amar Nath Transpot</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Tiara Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15120</ALTERID>
+     <MASTERID TYPE="Number"> 7359</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Tiara Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Trruu Global Brands Llp" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 14177</ALTERID>
+     <MASTERID TYPE="Number"> 5820</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Trruu Global Brands Llp</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Unicommerce Esolutions Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 12996</ALTERID>
+     <MASTERID TYPE="Number"> 5548</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Unicommerce Esolutions Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Uttam Toyata (A DIV OF TSTFP LTD)" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 625</ALTERID>
+     <MASTERID TYPE="Number"> 450</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Uttam Toyata (A DIV OF TSTFP LTD)</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Vardaan Chemtech Llp" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 8774</ALTERID>
+     <MASTERID TYPE="Number"> 3715</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Vardaan Chemtech Llp</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Vasu Aromas" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 5340</ALTERID>
+     <MASTERID TYPE="Number"> 2801</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Vasu Aromas</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="VB Techno" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 11290</ALTERID>
+     <MASTERID TYPE="Number"> 451</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>VB Techno</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Vee Aar Packers" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15308</ALTERID>
+     <MASTERID TYPE="Number"> 7478</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Vee Aar Packers</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Vikash Enterprises" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 9961</ALTERID>
+     <MASTERID TYPE="Number"> 2126</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Vikash Enterprises</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Vinarjan Chem Tech" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 11252</ALTERID>
+     <MASTERID TYPE="Number"> 4373</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Vinarjan Chem Tech</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Vision Medicare Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 10973</ALTERID>
+     <MASTERID TYPE="Number"> 4352</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Vision Medicare Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Vniel Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Goods</PARENT>
+     <ALTERID TYPE="Number"> 15100</ALTERID>
+     <MASTERID TYPE="Number"> 7339</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Vniel Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Volga Metal Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 10233</ALTERID>
+     <MASTERID TYPE="Number"> 4257</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Volga Metal Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Vrl Logistics Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S C For Transporter</PARENT>
+     <ALTERID TYPE="Number"> 15387</ALTERID>
+     <MASTERID TYPE="Number"> 2867</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Vrl Logistics Limited</NAME>
+       <NAME>Jaydeep Trans</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Waxchem Agencies" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 15596</ALTERID>
+     <MASTERID TYPE="Number"> 7697</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Waxchem Agencies</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Wellcraft Storage Systems Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 637</ALTERID>
+     <MASTERID TYPE="Number"> 462</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Wellcraft Storage Systems Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="WORLDLINE" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 623</ALTERID>
+     <MASTERID TYPE="Number"> 448</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>WORLDLINE</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Yadav Pharma Machinery (India)" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 14002</ALTERID>
+     <MASTERID TYPE="Number"> 5730</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Yadav Pharma Machinery (India)</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Yasham Speciality Ingredients Private Limited" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C For Otherthen Goods</PARENT>
+     <ALTERID TYPE="Number"> 8734</ALTERID>
+     <MASTERID TYPE="Number"> 3680</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Yasham Speciality Ingredients Private Limited</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Yiwu Tommy Trading Co. Ltd" RESERVEDNAME="">
+     <PARENT TYPE="String">S.C for Goods Import/logistcis</PARENT>
+     <ALTERID TYPE="Number"> 15125</ALTERID>
+     <MASTERID TYPE="Number"> 7364</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Yiwu Tommy Trading Co. Ltd</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+    <LEDGER NAME="Zentech Industries" RESERVEDNAME="">
+     <PARENT TYPE="String">Sundry Creditors</PARENT>
+     <ALTERID TYPE="Number"> 2442</ALTERID>
+     <MASTERID TYPE="Number"> 1931</MASTERID>
+     <LANGUAGENAME.LIST>
+      <NAME.LIST TYPE="String">
+       <NAME>Zentech Industries</NAME>
+      </NAME.LIST>
+      <LANGUAGEID TYPE="Number"> 1033</LANGUAGEID>
+     </LANGUAGENAME.LIST>
+    </LEDGER>
+   </COLLECTION>
+  </DATA>
+ </BODY>
+</ENVELOPE>

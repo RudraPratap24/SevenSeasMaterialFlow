@@ -14,7 +14,7 @@
  * (serialised by the write lock) and durable (InnoDB).
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import { DOC_COLLECTIONS, emptyState, FlowError, formatNo, SERIES, type DocCollection, type Series } from "../../src/flow/logic";
+import { DOC_COLLECTIONS, emptyState, FlowError, formatNo, numberTaken, SERIES, type DocCollection, type Series } from "../../src/flow/logic";
 import type {
   ArRecord,
   BomLine,
@@ -32,7 +32,9 @@ import type {
   PurchaseOrder,
   QcIntimation,
   Requisition,
+  PoClosure,
   Supplier,
+  TallyPo,
 } from "../../src/flow/types";
 import { blindIndex, decryptValue, encryptValue } from "./crypto";
 import type { Conn, Queryable } from "./db";
@@ -102,8 +104,8 @@ export async function getMastersVersion(db: Queryable): Promise<number> {
 
 export async function loadMasters(db: Queryable): Promise<MasterData> {
   const version = await getMastersVersion(db);
-  const components = (await rows(db, "SELECT code, name, type FROM components WHERE active = 1 ORDER BY code")).map(
-    (r) => ({ code: str(r.code), name: str(r.name), type: str(r.type) }),
+  const components = (await rows(db, "SELECT code, name, type, unit FROM components WHERE active = 1 ORDER BY code")).map(
+    (r) => ({ code: str(r.code), name: str(r.name), type: str(r.type), unit: str(r.unit) }),
   );
   const products = (
     await rows(db, "SELECT id, name, fg_code, vendor, box_size FROM products WHERE active = 1 ORDER BY id")
@@ -186,8 +188,9 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
   s.indents = (
     await header(
       "indents",
-      `SELECT h.indent_no, h.indent_date, h.component_code, c.name AS component, h.qty, h.reason, h.po_no
-         FROM purchase_indents h JOIN components c ON c.code = h.component_code /*WHERE*/ ORDER BY h.seq`,
+      `SELECT h.indent_no, h.indent_date, h.component_code, c.name AS component, h.qty, h.reason, h.po_no, h.rate_enc, s.name AS supplier
+         FROM purchase_indents h JOIN components c ON c.code = h.component_code
+         LEFT JOIN suppliers s ON s.id = h.supplier_id /*WHERE*/ ORDER BY h.seq`,
     )
   ).map(
     (r): Indent => ({
@@ -197,12 +200,15 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
       componentName: str(r.component),
       qty: num(r.qty),
       reason: str(r.reason),
+      supplierName: str(r.supplier),
+      rate: r.rate_enc ? Number(opened(r.rate_enc)) : null,
       status: r.po_no ? "PO_RAISED" : "OPEN",
     }),
   );
   const poRows = await header(
     "purchaseOrders",
     `SELECT h.po_no, h.po_date, s.name AS supplier, h.expected_date, h.approved_by, u.label AS approver,
+            DATE_FORMAT(h.tally_push_at, '%d-%m-%Y %H:%i') AS pushed_at, h.tally_push_error,
             (SELECT GROUP_CONCAT(x.indent_no ORDER BY x.seq) FROM purchase_indents x WHERE x.po_no = h.po_no) AS indent_ids
        FROM purchase_orders h JOIN suppliers s ON s.id = h.supplier_id
        LEFT JOIN users u ON u.id = h.approved_by /*WHERE*/ ORDER BY h.seq`,
@@ -230,16 +236,63 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
       status: r.approved_by !== null ? "APPROVED" : "PENDING_APPROVAL",
       approvedBy: str(r.approver),
       indentIds: r.indent_ids ? str(r.indent_ids).split(",") : [],
+      tallyPushedAt: str(r.pushed_at),
+      tallyError: str(r.tally_push_error),
+    }),
+  );
+
+  const tallyRows = await header(
+    "tallyPos",
+    `SELECT h.po_no, h.po_date, h.supplier_name, h.cancelled, DATE_FORMAT(h.synced_at, '%d-%m-%Y %H:%i') AS synced,
+            h.guid, h.alter_id
+       FROM tally_purchase_orders h /*WHERE*/ ORDER BY h.seq`,
+  );
+  const tallyLines = await linesOf(
+    db,
+    "SELECT po_no, item_name, item_code, qty, unit FROM tally_po_lines WHERE po_no IN (?) ORDER BY po_no, line_no",
+    tallyRows.map((r) => str(r.po_no)),
+    "po_no",
+  );
+  s.tallyPos = tallyRows.map(
+    (r): TallyPo => ({
+      poNo: str(r.po_no),
+      date: fromSqlDate(r.po_date),
+      supplierName: str(r.supplier_name),
+      cancelled: num(r.cancelled) === 1,
+      syncedAt: str(r.synced),
+      guid: str(r.guid),
+      alterId: num(r.alter_id),
+      lines: (tallyLines.get(str(r.po_no)) ?? []).map((l) => ({
+        itemName: str(l.item_name),
+        itemCode: str(l.item_code),
+        qty: num(l.qty),
+        unit: str(l.unit),
+      })),
+    }),
+  );
+
+  s.poClosures = (await header("poClosures", "SELECT h.* FROM po_closures h /*WHERE*/ ORDER BY h.seq")).map(
+    (r): PoClosure => ({
+      poNo: str(r.po_no),
+      closed: num(r.closed) === 1,
+      date: fromSqlDate(r.closed_on),
+      by: str(r.closed_by),
+      reason: str(r.reason),
     }),
   );
 
   /* inward */
-  s.gateEntries = (
-    await header(
-      "gateEntries",
-      "SELECT h.*, s.name AS supplier FROM gate_entries h JOIN suppliers s ON s.id = h.supplier_id /*WHERE*/ ORDER BY h.seq",
-    )
-  ).map(
+  const gateRows = await header(
+    "gateEntries",
+    "SELECT h.*, s.name AS supplier FROM gate_entries h JOIN suppliers s ON s.id = h.supplier_id /*WHERE*/ ORDER BY h.seq",
+  );
+  const gateLines = await linesOf(
+    db,
+    "SELECT gate_entry_no, item_name, item_code, unit, qty, remark FROM gate_entry_lines WHERE gate_entry_no IN (?) ORDER BY gate_entry_no, line_no",
+    gateRows.map((r) => str(r.gate_entry_no)),
+    "gate_entry_no",
+  );
+  s.gateEntries = gateRows.map(
     (r): GateEntry => ({
       id: str(r.gate_entry_no),
       date: fromSqlDate(r.entry_date),
@@ -247,7 +300,7 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
       productDesc: str(r.product_desc),
       invoiceNo: str(r.invoice_no),
       invoiceDate: fromSqlDate(r.invoice_date),
-      poNo: str(r.po_no ?? r.external_po_ref),
+      poNo: str(r.po_no ?? r.tally_po_no ?? r.external_po_ref),
       invoiceQty: numOrNull(r.invoice_qty),
       transportName: str(r.transport_name),
       lrNo: opened(r.lr_no_enc),
@@ -256,12 +309,19 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
       timeOut: fromSqlTime(r.time_out),
       driverSign: num(r.driver_signed) === 1,
       remark: str(r.remark),
+      lines: (gateLines.get(str(r.gate_entry_no)) ?? []).map((l) => ({
+        itemName: str(l.item_name),
+        itemCode: str(l.item_code),
+        unit: str(l.unit),
+        qty: num(l.qty),
+        remark: str(l.remark),
+      })),
     }),
   );
   s.grnLines = (
     await header(
       "grnLines",
-      `SELECT h.*, c.name AS component, c.type AS ctype, g.po_no, g.external_po_ref, g.invoice_no,
+      `SELECT h.*, c.name AS component, c.type AS ctype, g.po_no, g.external_po_ref, g.tally_po_no, g.invoice_no,
               s.name AS supplier, loc.name AS location, v.qc_status
          FROM goods_receipts h
          JOIN components c ON c.code = h.component_code
@@ -275,18 +335,20 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
     (r): GrnLine => ({
       grnNo: str(r.grn_no),
       gateEntryId: str(r.gate_entry_no),
+      gateLineNo: numOrNull(r.gate_line_no),
       componentCode: str(r.component_code),
       componentName: str(r.component),
       type: str(r.ctype),
       brandName: str(r.brand_name),
       receivedDate: fromSqlDate(r.received_date),
-      poNo: str(r.po_no ?? r.external_po_ref),
+      poNo: str(r.po_no ?? r.tally_po_no ?? r.external_po_ref),
       poQty: numOrNull(r.po_qty),
       invoiceNo: str(r.invoice_no),
       supplierName: str(r.supplier),
       qtyPerBox: numOrNull(r.qty_per_box),
       totalBoxes: numOrNull(r.total_boxes),
       totalQty: num(r.total_qty),
+      unit: str(r.unit),
       remarkStore: str(r.remark_store),
       location: str(r.location),
       qcStatus: r.qc_status as GrnLine["qcStatus"],
@@ -676,6 +738,8 @@ class Resolver {
 const DOC_ORDER = [
   "purchaseOrders",
   "indents",
+  "tallyPos",
+  "poClosures",
   "gateEntries",
   "grnLines",
   "qcIntimations",
@@ -692,6 +756,8 @@ type DocKey = (typeof DOC_ORDER)[number];
 const KEY_OF: Record<DocKey, (d: never) => string> = {
   purchaseOrders: (d: PurchaseOrder) => d.id,
   indents: (d: Indent) => d.id,
+  tallyPos: (d: TallyPo) => d.poNo,
+  poClosures: (d: PoClosure) => d.poNo,
   gateEntries: (d: GateEntry) => d.id,
   grnLines: (d: GrnLine) => d.grnNo,
   qcIntimations: (d: QcIntimation) => d.id,
@@ -724,7 +790,11 @@ const DELETE_ORDER = [
   "qc_results",
   "qc_intimations",
   "goods_receipts",
+  "gate_entry_lines",
   "gate_entries",
+  "po_closures",
+  "tally_po_lines",
+  "tally_purchase_orders",
   "purchase_indents",
   "purchase_order_lines",
   "purchase_orders",
@@ -791,19 +861,63 @@ class Writer {
 
   async indents(d: Indent) {
     await this.exec(
-      `INSERT INTO purchase_indents (indent_no, indent_date, component_code, qty, reason, po_no, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [d.id, toSqlDate(d.date), d.componentCode, d.qty, d.reason, d.status === "PO_RAISED" ? this.poOfIndent(d.id) : null, this.by, this.by],
+      `INSERT INTO purchase_indents (indent_no, indent_date, component_code, qty, reason, supplier_id, rate_enc, po_no, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        d.id,
+        toSqlDate(d.date),
+        d.componentCode,
+        d.qty,
+        d.reason,
+        d.supplierName ? await this.r.supplier(d.supplierName) : null,
+        d.rate === null || d.rate === undefined ? null : encryptValue(String(d.rate)),
+        d.status === "PO_RAISED" ? this.poOfIndent(d.id) : null,
+        this.by,
+        this.by,
+      ],
     );
   }
 
+  async tallyPos(d: TallyPo) {
+    await this.exec(
+      `INSERT INTO tally_purchase_orders (po_no, po_date, supplier_name, cancelled, synced_at, guid, alter_id, created_by, updated_by)
+       VALUES (?, ?, ?, ?, STR_TO_DATE(?, '%d-%m-%Y %H:%i'), ?, ?, ?, ?)`,
+      [d.poNo, toSqlDate(d.date), d.supplierName, d.cancelled ? 1 : 0, d.syncedAt, d.guid ?? "", d.alterId ?? 0, this.by, this.by],
+    );
+    await this.tallyPoLines(d);
+  }
+
+  async poClosures(d: PoClosure) {
+    await this.exec(
+      `INSERT INTO po_closures (po_no, closed, closed_on, closed_by, reason, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [d.poNo, d.closed ? 1 : 0, toSqlDate(d.date), d.by, d.reason, this.by, this.by],
+    );
+  }
+
+  private async tallyPoLines(d: TallyPo) {
+    let n = 0;
+    for (const l of d.lines) {
+      await this.exec("INSERT INTO tally_po_lines (po_no, line_no, item_name, item_code, qty, unit) VALUES (?, ?, ?, ?, ?, ?)", [
+        d.poNo,
+        ++n,
+        l.itemName,
+        l.itemCode,
+        l.qty,
+        l.unit,
+      ]);
+    }
+  }
+
   async gateEntries(d: GateEntry) {
-    const inSystem = d.poNo !== "" && this.after.purchaseOrders.some((p) => p.id === d.poNo);
+    // a PO raised here is received against its own record, even once Tally has a copy of it
+    const inSystem = d.poNo !== "" && this.after.purchaseOrders.some((p) => p.id === d.poNo && p.status === "APPROVED" && !numberTaken(p));
+    const inTally = !inSystem && d.poNo !== "" && this.after.tallyPos.some((p) => p.poNo === d.poNo);
     await this.exec(
       `INSERT INTO gate_entries (gate_entry_no, entry_date, supplier_id, product_desc, invoice_no, invoice_date, invoice_qty,
-         po_no, external_po_ref, transport_name, lr_no_enc, vehicle_no_enc, time_in, time_out, driver_signed, remark,
+         po_no, external_po_ref, tally_po_no, transport_name, lr_no_enc, vehicle_no_enc, time_in, time_out, driver_signed, remark,
          created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         d.id,
         toSqlDate(d.date),
@@ -813,7 +927,8 @@ class Writer {
         toSqlDate(d.invoiceDate),
         d.invoiceQty,
         inSystem ? d.poNo : null,
-        !inSystem && d.poNo ? d.poNo : null,
+        !inSystem && !inTally && d.poNo ? d.poNo : null,
+        inTally ? d.poNo : null,
         d.transportName,
         sealed(d.lrNo),
         sealed(d.vehicleNo),
@@ -825,6 +940,13 @@ class Writer {
         this.by,
       ],
     );
+    let n = 0;
+    for (const l of d.lines) {
+      await this.exec(
+        "INSERT INTO gate_entry_lines (gate_entry_no, line_no, item_name, item_code, unit, qty, remark) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [d.id, ++n, l.itemName, l.itemCode, l.unit, l.qty, l.remark],
+      );
+    }
   }
 
   async grnLines(d: GrnLine) {
@@ -835,12 +957,13 @@ class Writer {
       throw new ConsistencyError(`GRN ${d.grnNo}: supplier/invoice/PO differ from gate entry ${gate.id}`);
     }
     await this.exec(
-      `INSERT INTO goods_receipts (grn_no, gate_entry_no, component_code, brand_name, received_date, po_qty, qty_per_box,
-         total_boxes, total_qty, location_id, barcoded, remark_store, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO goods_receipts (grn_no, gate_entry_no, gate_line_no, component_code, brand_name, received_date, po_qty,
+         qty_per_box, total_boxes, total_qty, unit, location_id, barcoded, remark_store, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         d.grnNo,
         d.gateEntryId,
+        d.gateLineNo,
         d.componentCode,
         d.brandName,
         toSqlDate(d.receivedDate),
@@ -848,6 +971,7 @@ class Writer {
         d.qtyPerBox,
         d.totalBoxes,
         d.totalQty,
+        d.unit,
         await this.r.location(d.location),
         d.barcoded ? 1 : 0,
         d.remarkStore,
@@ -1026,6 +1150,40 @@ class Writer {
 
   async update(c: DocKey, before: unknown, after: unknown): Promise<void> {
     switch (c) {
+      case "tallyPos": {
+        // A fresh copy from Tally replaces the old one; receipts live on the gate entries, so nothing is lost.
+        const a = after as TallyPo;
+        await this.exec(
+          `UPDATE tally_purchase_orders SET po_date = ?, supplier_name = ?, cancelled = ?,
+                  synced_at = STR_TO_DATE(?, '%d-%m-%Y %H:%i'), guid = ?, alter_id = ?, updated_by = ? WHERE po_no = ?`,
+          [toSqlDate(a.date), a.supplierName, a.cancelled ? 1 : 0, a.syncedAt, a.guid ?? "", a.alterId ?? 0, this.by, a.poNo],
+        );
+        await this.exec("DELETE FROM tally_po_lines WHERE po_no = ?", [a.poNo]);
+        await this.tallyPoLines(a);
+        return;
+      }
+      case "poClosures": {
+        const a = after as PoClosure;
+        await this.exec("UPDATE po_closures SET closed = ?, closed_on = ?, closed_by = ?, reason = ?, updated_by = ? WHERE po_no = ?", [
+          a.closed ? 1 : 0,
+          toSqlDate(a.date),
+          a.by,
+          a.reason,
+          this.by,
+          a.poNo,
+        ]);
+        return;
+      }
+      case "gateEntries": {
+        const a = after as GateEntry;
+        await this.exec("UPDATE gate_entries SET time_out = ?, driver_signed = ?, updated_by = ? WHERE gate_entry_no = ?", [
+          toSqlTime(a.timeOut),
+          a.driverSign ? 1 : 0,
+          this.by,
+          a.id,
+        ]);
+        return;
+      }
       case "grnLines": {
         const a = after as GrnLine;
         await this.exec(
@@ -1107,6 +1265,12 @@ class Writer {
             this.by,
             a.id,
           ]);
+        }
+        if (a.tallyPushedAt !== b.tallyPushedAt || a.tallyError !== b.tallyError) {
+          await this.exec(
+            "UPDATE purchase_orders SET tally_push_at = STR_TO_DATE(?, '%d-%m-%Y %H:%i'), tally_push_error = ? WHERE po_no = ?",
+            [a.tallyPushedAt || null, a.tallyError || null, a.id],
+          );
         }
         return;
       }
@@ -1237,6 +1401,22 @@ async function stampVersion(conn: Conn, touched: Map<DocCollection, Set<string>>
   }
 }
 
+/**
+ * Gives a PO a new number. Its lines and indents follow (ON UPDATE CASCADE; callers refuse a PO with gate entries,
+ * whose link does not follow); the stage lock lets the
+ * number change only inside this call. Every open screen reloads, so nobody keeps the old number. Caller's transaction.
+ */
+export async function renumberPo(conn: Conn, from: string, to: string): Promise<void> {
+  await conn.query("SET @flow_renumber = 1");
+  try {
+    await conn.query("UPDATE purchase_orders SET po_no = ?, tally_push_at = NULL, tally_push_error = NULL WHERE po_no = ?", [to, from]);
+    await conn.query("UPDATE po_closures SET po_no = ? WHERE po_no = ?", [to, from]);
+  } finally {
+    await conn.query("SET @flow_renumber = NULL");
+  }
+  await requestResync(conn);
+}
+
 /** Tells every open screen to reload everything (used where many documents change at once). */
 export async function requestResync(conn: Conn): Promise<void> {
   await conn.query("UPDATE app_meta SET v = CAST(v AS UNSIGNED) + 1 WHERE k IN ('state_version', 'resync_version')");
@@ -1260,8 +1440,11 @@ export async function seedSequences(conn: Conn, state: FlowState): Promise<void>
     WO: state.orders.map((x) => x.id),
     DPS: state.dispatchSlips.map((x) => x.id),
     IND: state.indents.map((x) => x.id),
-    // PO numbers continue the client's series, including paper POs quoted at the gate.
-    PO: [...state.purchaseOrders.map((x) => x.id), ...state.gateEntries.map((g) => g.poNo).filter((p) => p.startsWith(SERIES.PO.prefix))],
+    // PO numbers continue the client's series — after paper POs quoted at the gate and POs made in Tally.
+    PO: [
+      ...state.purchaseOrders.map((x) => x.id),
+      ...[...state.gateEntries.map((g) => g.poNo), ...state.tallyPos.map((p) => p.poNo)].filter((p) => p.startsWith(SERIES.PO.prefix)),
+    ],
   };
   for (const series of Object.keys(SERIES) as Series[]) {
     const last = Math.max(0, ...existing[series].map(trailingNo));
@@ -1271,6 +1454,15 @@ export async function seedSequences(conn: Conn, state: FlowState): Promise<void>
       await conn.query("INSERT INTO document_sequences (series, last_no) VALUES (?, ?)", [series, last]);
     }
   }
+}
+
+/**
+ * Keeps our PO series ahead of PO numbers made in Tally (same 26SEV… series), so a PO raised here never
+ * takes a number Tally already used. In the caller's transaction.
+ */
+export async function skipTallyPoNumbers(conn: Conn, poNos: string[]): Promise<void> {
+  const last = Math.max(0, ...poNos.filter((p) => p.startsWith(SERIES.PO.prefix)).map(trailingNo));
+  await conn.query("UPDATE document_sequences SET last_no = GREATEST(last_no, ?) WHERE series = 'PO'", [last]);
 }
 
 /**
@@ -1316,17 +1508,28 @@ export async function saveSnapshot(
 
 export async function loadSnapshot(db: Queryable, id: number): Promise<FlowState | null> {
   const r = await rows(db, "SELECT data FROM state_snapshots WHERE id = ?", [id]);
-  return r[0] ? decryptValue<FlowState>(str(r[0].data)) : null;
+  if (!r[0]) return null;
+  const s = decryptValue<FlowState>(str(r[0].data));
+  // Snapshots taken before Tally POs and gate entry lines existed.
+  return {
+    ...s,
+    tallyPos: (s.tallyPos ?? []).map((p) => ({ ...p, guid: p.guid ?? "", alterId: p.alterId ?? 0 })),
+    poClosures: s.poClosures ?? [],
+    indents: s.indents.map((i) => ({ ...i, rate: i.rate ?? null })),
+    purchaseOrders: s.purchaseOrders.map((p) => ({ ...p, tallyPushedAt: p.tallyPushedAt ?? "", tallyError: p.tallyError ?? "" })),
+    gateEntries: s.gateEntries.map((g) => ({ ...g, lines: g.lines ?? [] })),
+  };
 }
 
 /* ── suppliers (price master) ───────────────────────────────────────────────── */
 
 export async function loadSuppliers(db: Queryable): Promise<Supplier[]> {
-  const list = await rows(db, "SELECT id, name, city FROM suppliers WHERE active = 1 AND approved = 1 ORDER BY id");
+  const list = await rows(db, "SELECT id, name, city, from_tally FROM suppliers WHERE active = 1 AND approved = 1 ORDER BY id");
   const rates = groupBy(await rows(db, "SELECT supplier_id, component_code, rate_enc FROM supplier_rates"), "supplier_id");
   return list.map((s) => ({
     name: str(s.name),
     city: str(s.city),
+    fromTally: num(s.from_tally) === 1,
     rates: Object.fromEntries(
       (rates.get(str(s.id)) ?? []).map((r) => [str(r.component_code), Number(opened(r.rate_enc))]),
     ),

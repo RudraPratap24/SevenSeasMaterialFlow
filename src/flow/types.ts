@@ -23,12 +23,59 @@ export interface GateEntry {
   timeOut: string;
   driverSign: boolean;
   remark: string;
+  /** Items checked in against a Tally PO, one row each. Empty for a direct arrival without PO. */
+  lines: GateEntryLine[];
+}
+
+/** One PO item the guard checked in: name, code and unit come from the Tally PO. */
+export interface GateEntryLine {
+  itemName: string;
+  itemCode: string;
+  unit: string;
+  qty: number;
+  /** e.g. "20 Doz short" — the item stays open on the PO until fully received. */
+  remark: string;
+}
+
+/** A Purchase Order as it stands in Tally (read-only copy; Tally is never written to). */
+export interface TallyPo {
+  poNo: string;
+  date: string;
+  supplierName: string;
+  cancelled: boolean;
+  /** When this copy was last taken from Tally (dd-mm-yyyy hh:mm). */
+  syncedAt: string;
+  /** Tally's id of the voucher and its change number ("" / 0 for copies made before they were kept). */
+  guid: string;
+  alterId: number;
+  lines: TallyPoLine[];
+  /** Set by gatePos from the PO closures — never stored on the copy. */
+  closed?: boolean;
+}
+
+/** A PO marked closed in MySQL (Purchase by hand, or the go-live cut-over); reopening sets closed false. */
+export interface PoClosure {
+  poNo: string;
+  closed: boolean;
+  date: string;
+  by: string;
+  reason: string;
+}
+
+export interface TallyPoLine {
+  itemName: string;
+  /** PMS code when the item is in the component master, else "". */
+  itemCode: string;
+  qty: number;
+  unit: string;
 }
 
 /** GRN register — the Store's Excel sheet, one row per component receipt. SOP step 4. */
 export interface GrnLine {
   grnNo: string; // GR0001
   gateEntryId: string;
+  /** The gate-checked PO item (1-based line of the gate entry) this GRN counts; null for an arrival without PO. */
+  gateLineNo: number | null;
   componentCode: string;
   componentName: string;
   type: string;
@@ -41,6 +88,8 @@ export interface GrnLine {
   qtyPerBox: number | null;
   totalBoxes: number | null;
   totalQty: number;
+  /** The PO's unit (Doz, Kg, Pcs …); "" = pcs (receipts from before Tally POs). */
+  unit: string;
   remarkStore: string;
   /** Where the material is kept — client wants stock place-wise. */
   location: string;
@@ -205,6 +254,10 @@ export interface Indent {
   componentName: string;
   qty: number;
   reason: string;
+  /** The vendor to buy from — a PO gathers the open indents of one vendor. "" on indents made before vendors were recorded. */
+  supplierName: string;
+  /** Expected rate per unit (₹), carried onto the PO line; null on indents made before rates were asked. */
+  rate: number | null;
   status: "OPEN" | "PO_RAISED";
 }
 
@@ -224,6 +277,9 @@ export interface PurchaseOrder {
   status: "PENDING_APPROVAL" | "APPROVED";
   approvedBy: string;
   indentIds: string[];
+  /** Last attempt to create it in Tally (dd-mm-yyyy hh:mm, "" = never) and why Tally refused ("" = created). */
+  tallyPushedAt: string;
+  tallyError: string;
 }
 
 /** Component master — the client's PMS component list (database table `components`). */
@@ -231,6 +287,8 @@ export interface ComponentInfo {
   code: string;
   name: string;
   type: string;
+  /** Tally base unit (Pcs, Kg …); "" = pcs. */
+  unit: string;
 }
 
 /** One BOM line: component code `c`, name `n`, quantity per 100 finished units `p`. */
@@ -261,6 +319,8 @@ export interface ProductMaster {
 export interface Supplier {
   name: string;
   city: string;
+  /** A ledger in Tally (synced) — once Tally is connected, only these can be on an indent or PO. */
+  fromTally: boolean;
   /** Fixed rate per component code. */
   rates: Record<string, number>;
 }
@@ -287,4 +347,6 @@ export interface FlowState {
   dispatchSlips: DispatchSlip[];
   indents: Indent[];
   purchaseOrders: PurchaseOrder[];
+  tallyPos: TallyPo[];
+  poClosures: PoClosure[];
 }

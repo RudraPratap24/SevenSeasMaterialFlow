@@ -46,7 +46,7 @@ const qc = await screen("qc");
 
 const blankGate = (supplierName) => ({
   date: "", supplierName, productDesc: "parallel test", invoiceNo: "", invoiceDate: "", poNo: "", invoiceQty: null,
-  transportName: "", lrNo: "", vehicleNo: "", timeIn: "", timeOut: "", driverSign: false, remark: "",
+  transportName: "", lrNo: "", vehicleNo: "HR55-T-0001", timeIn: "00:00", timeOut: "", driverSign: false, remark: "", lines: [],
 });
 
 const newGrn = async (qty) => {
@@ -54,7 +54,7 @@ const newGrn = async (qty) => {
   const geId = ge.json.changes.gateEntries.at(-1).id;
   await store.sync();
   const grn = await store.act("addGrnLine", [{
-    gateEntryId: geId, componentCode: "PMS0002", componentName: "", type: "", brandName: "SEVEN SEAS", receivedDate: "",
+    gateEntryId: geId, gateLineNo: null, unit: "", componentCode: "PMS0002", componentName: "", type: "", brandName: "SEVEN SEAS", receivedDate: "",
     poNo: "", poQty: null, invoiceNo: "", supplierName: "", qtyPerBox: 100, totalBoxes: qty / 100, totalQty: qty, remarkStore: "", location: "Store — Floor 1",
   }]);
   return grn.json.changes.grnLines.at(-1).grnNo;

@@ -4,21 +4,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#16283D",
-        paper: "#E9EEF3",
+        ink: "#111111",
+        paper: "#F2F2F2",
         card: "#FFFFFF",
-        rule: "#D8E0E8",
-        muted: "#64798F",
-        blue: "#1B4D8F",
-        "blue-dk": "#143A6B",
-        "blue-soft": "#EAF1F9",
+        rule: "#DCDCDC",
+        muted: "#666666",
+        blue: "#111111",
+        "blue-dk": "#000000",
+        "blue-soft": "#F0F0F0",
         red: "#B3261E",
         "red-soft": "#FBEAE8",
         amber: "#B45309",
         "amber-soft": "#FDF3E5",
         green: "#0F7B5A",
         "green-soft": "#E7F4EF",
-        zebra: "#FBFCFD",
+        zebra: "#FAFAFA",
       },
       fontFamily: {
         sans: [
