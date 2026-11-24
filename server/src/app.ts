@@ -91,7 +91,8 @@ export function createApp() {
     }),
   );
   app.use((_req, res, next) => {
-    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+    // the gate takes one photo per vehicle with this site's own pages; nothing else may use the camera
+    res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=(), payment=()");
     next();
   });
 
@@ -142,11 +143,15 @@ export function createApp() {
         },
       }),
     );
-    app.get(/^\/(?!api\/).*/, (_req, res) => {
+    // The app is one page (tabs switch inside it): only "/" serves it — any other path is a plain 404, not the page.
+    app.get(["/", "/index.html"], (_req, res) => {
       res.setHeader("Cache-Control", "no-cache");
       res.sendFile(path.join(dist, "index.html"));
     });
   }
+  app.use((_req, res) => {
+    res.status(404).type("text/plain").send("Not found");
+  });
 
   // Last resort: log the details, tell the client nothing about internals.
   app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {

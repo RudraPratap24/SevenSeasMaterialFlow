@@ -45,8 +45,8 @@ const store = await screen("store");
 const qc = await screen("qc");
 
 const blankGate = (supplierName) => ({
-  date: "", supplierName, productDesc: "parallel test", invoiceNo: "", invoiceDate: "", poNo: "", invoiceQty: null,
-  transportName: "", lrNo: "", vehicleNo: "HR55-T-0001", timeIn: "00:00", timeOut: "", driverSign: false, remark: "", lines: [],
+  supplierName, invoiceNo: "", invoiceDate: "", invoiceQty: null, invoiceQtyUnit: "",
+  transportName: "", lrNo: "", vehicleNo: "HR55-T-0001", driverName: "", driverPhone: "",
 });
 
 const newGrn = async (qty) => {
@@ -55,7 +55,7 @@ const newGrn = async (qty) => {
   await store.sync();
   const grn = await store.act("addGrnLine", [{
     gateEntryId: geId, gateLineNo: null, unit: "", componentCode: "PMS0002", componentName: "", type: "", brandName: "SEVEN SEAS", receivedDate: "",
-    poNo: "", poQty: null, invoiceNo: "", supplierName: "", qtyPerBox: 100, totalBoxes: qty / 100, totalQty: qty, remarkStore: "", location: "Store — Floor 1",
+    poNo: "", poItemName: "", poQty: null, invoiceNo: "", supplierName: "", qtyPerBox: 100, totalBoxes: qty / 100, totalQty: qty, remarkStore: "", location: "Store — Floor 1",
   }]);
   return grn.json.changes.grnLines.at(-1).grnNo;
 };
@@ -101,7 +101,7 @@ console.log("screens receive only what changed");
 {
   await store.sync(); // Store's screen is up to date …
   const before = store.version;
-  const r = await gate.act("addGateEntry", [blankGate("Aplay Creation")]); // … then Gate files one entry
+  const r = await gate.act("addGateEntry", [blankGate("Shree Packwell")]); // … then Gate files one entry
   const delta = await store.call("GET", `/api/changes?since=${before}`);
   const n = Object.entries(delta.json.changes).filter(([k]) => k !== "openings" && k !== "minLevels").reduce((a, [, v]) => a + v.length, 0);
   check("store's update after Gate's entry carries just that one document", n === 1 && delta.json.changes.gateEntries[0].id === r.json.changes.gateEntries.at(-1).id, `${n} documents`);
@@ -110,10 +110,10 @@ console.log("screens receive only what changed");
 console.log("unrelated work runs in parallel; numbers stay unique and gap-free");
 {
   const t0 = Date.now();
-  const rs = await Promise.all(Array.from({ length: 12 }, (_, i) => gate.act("addGateEntry", [blankGate(`Parallel Supplier ${i}`)], 0)));
+  const rs = await Promise.all(Array.from({ length: 12 }, (_, i) => gate.act("addGateEntry", [{ ...blankGate("Shree Packwell"), vehicleNo: `PAR-${i}` }], 0)));
   check("12 simultaneous gate entries all saved", rs.every((r) => r.status === 200), rs.map((r) => r.status).join(","));
   await gate.sync();
-  const mine = gate.state.gateEntries.filter((g) => g.supplierName.startsWith("Parallel Supplier")).map((g) => Number(g.id.slice(3))).sort((a, b) => a - b);
+  const mine = gate.state.gateEntries.filter((g) => g.vehicleNo.startsWith("PAR-")).map((g) => Number(g.id.slice(3))).sort((a, b) => a - b);
   check("12 distinct numbers with no gaps", mine.length === 12 && mine.every((n, i) => i === 0 || n === mine[i - 1] + 1), mine.join(","));
   console.log(`        (12 parallel saves in ${Date.now() - t0} ms)`);
 }
@@ -133,10 +133,11 @@ console.log("a long action on one document does not block work on another");
     const name = `${process.env.DB_NAME.slice(0, 20)}:${createHash("sha1").update(`doc:grnLines:${a.grnNo}`).digest("hex").slice(0, 32)}`;
     await db.query("SELECT GET_LOCK(?, 5)", [name]);
     const t1 = Date.now();
-    const other = await store.act("updateGrnQty", [b.grnNo, b.totalQty], 1e12);
+    await store.sync();
+    const other = await store.act("updateGrnQty", [b.grnNo, b.totalQty]);
     check(`GRN ${b.grnNo} saved at once while ${a.grnNo} is busy`, other.status === 200 && Date.now() - t1 < 2000, `${Date.now() - t1} ms`);
     const t2 = Date.now();
-    const waiting = store.act("updateGrnQty", [a.grnNo, a.totalQty], 1e12);
+    const waiting = store.act("updateGrnQty", [a.grnNo, a.totalQty]);
     setTimeout(() => db.query("DO RELEASE_LOCK(?)", [name]), 1500);
     const same = await waiting;
     check(`GRN ${a.grnNo} waited for the busy action, then saved`, same.status === 200 && Date.now() - t2 >= 1400, `${Date.now() - t2} ms`);

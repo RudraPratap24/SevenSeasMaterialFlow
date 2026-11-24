@@ -14,17 +14,28 @@ export interface GateEntry {
   productDesc: string;
   invoiceNo: string;
   invoiceDate: string;
+  /** Only on entries from before the gate became manual (the PO is chosen at GRN now); "" on new ones. */
   poNo: string;
   invoiceQty: number | null;
+  /** The unit of the invoice quantity as the guard noted it: Box, Kg, or typed ("" on old entries). */
+  invoiceQtyUnit: string;
   transportName: string;
   lrNo: string;
   vehicleNo: string;
+  driverName: string;
+  driverPhone: string;
+  /** Server time when the entry was made / when "Vehicle out" was pressed. */
   timeIn: string;
   timeOut: string;
   driverSign: boolean;
   remark: string;
-  /** Items checked in against a Tally PO, one row each. Empty for a direct arrival without PO. */
+  /** Items checked in against a PO — only on entries from before the gate became manual; empty on new ones. */
   lines: GateEntryLine[];
+  /** The gate photo is stored (served by GET /api/gate-entries/:id/photo, never sent with the state). */
+  hasPhoto: boolean;
+  /** The guard who made the entry: the person's name (else the login's label), and the login id. */
+  guard?: string;
+  guardLogin?: string;
 }
 
 /** One PO item the guard checked in: name, code and unit come from the Tally PO. */
@@ -97,6 +108,17 @@ export interface GrnLine {
   qcStatus: QcStatus;
   /** Step 10 — barcode sticker pasted on approved material. */
   barcoded: boolean;
+  /** QC's latest decision: how much of it was accepted (see ArRecord.acceptedQty); null = all or nothing. */
+  acceptedQty: number | null;
+  /** The PO item this GRN counts (as on the PO) — set when Store picked the PO at GRN; "" on older GRNs. */
+  poItemName: string;
+  poItemCode: string;
+  /** What was still pending on that PO item before this GRN (null on older GRNs). */
+  pendingBefore: number | null;
+  /** Count vs pending beyond the tolerance (±20%): SHORT or EXCESS — for the escalation tab; "" within it. */
+  variance: "" | "SHORT" | "EXCESS";
+  /** This GRN completes its PO item (within the tolerance, or excess): nothing more is expected for it. */
+  closesItem: boolean;
 }
 
 /** Q.C Intimation Slip (PM/RM) — handwritten format ②. SOP step 6. */
@@ -124,6 +146,63 @@ export interface ArRecord {
   date: string;
   status: Exclude<QcStatus, "UNDER_TEST">;
   remark: string;
+  /**
+   * Of the slip's quantity, how much QC accepted: approved = all or part (the rest is rejected and goes to a debit
+   * note), rejected = 0. Null on a hold, and on decisions made before QC could split a lot (then all or nothing).
+   */
+  acceptedQty: number | null;
+}
+
+/** An escalation closed: a GRN counted more than 20% short or over what was pending, settled with a resolution. */
+/** What Store actually gave against a requisition BOM list (the BOM issue slip). Counts as issued PM stock. */
+export interface BomIssue {
+  bomNo: string;
+  date: string;
+  filledBy: string;
+  lines: {
+    componentCode: string;
+    componentName: string;
+    requiredQty: number;
+    issuedQty: number;
+    remark: string;
+    /** Store-approved qty returned by MRNs against this BOM list — back in stock. */
+    returnedQty?: number;
+  }[];
+}
+
+export interface EscalationClosure {
+  grnNo: string;
+  date: string;
+  by: string;
+  resolution: string;
+}
+
+/**
+ * Debit note to the vendor on one GRN (settles it: no replacement is expected) — for what QC rejected, or for a SHORT
+ * supply billed but not delivered (raised from its escalation). At most one of each kind per GRN.
+ */
+export interface DebitNote {
+  id: string; // DN-0001
+  kind: "QC_REJECTED" | "SHORT_SUPPLY";
+  date: string;
+  grnNo: string;
+  /** The QC result it debits; "" on a short-supply note. */
+  arNo: string;
+  supplierName: string;
+  /** The supplier's invoice the material came on (from the gate entry) — the vendor's reference for the debit. */
+  invoiceNo: string;
+  poNo: string;
+  componentCode: string;
+  componentName: string;
+  /** The rejected (or short-supplied) quantity, in the GRN's unit. */
+  qty: number;
+  unit: string;
+  /** ₹ per unit — the PO's rate where the app has it, else as Purchase enters it. */
+  rate: number;
+  amount: number;
+  reason: string;
+  /** Who raised it (Purchase / Admin). */
+  raisedBy: string;
 }
 
 /** One line of a Requisition Slip. */
@@ -259,6 +338,8 @@ export interface Indent {
   /** Expected rate per unit (₹), carried onto the PO line; null on indents made before rates were asked. */
   rate: number | null;
   status: "OPEN" | "PO_RAISED";
+  /** The production indent request (IR-…) it was made from; absent on indents Purchase made itself. */
+  requestNo?: string;
 }
 
 export interface PoLine {
@@ -268,14 +349,21 @@ export interface PoLine {
   rate: number | null;
 }
 
+export type GstType = "INTRA" | "INTER";
+
 export interface PurchaseOrder {
   id: string; // continues the client's series: 26SEV231…
   date: string;
   supplierName: string;
   lines: PoLine[];
   expectedDate: string;
-  status: "PENDING_APPROVAL" | "APPROVED";
+  status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
   approvedBy: string;
+  /** Who rejected it and why ("" unless REJECTED); a rejected PO's indents are open again. */
+  rejectedBy?: string;
+  rejectReason?: string;
+  /** GST as Purchase chose it: same state (CGST 9% + SGST 9%) or another state (IGST 18%). Absent on POs from before GST. */
+  gst?: GstType;
   indentIds: string[];
   /** Last attempt to create it in Tally (dd-mm-yyyy hh:mm, "" = never) and why Tally refused ("" = created). */
   tallyPushedAt: string;
@@ -289,6 +377,8 @@ export interface ComponentInfo {
   type: string;
   /** Tally base unit (Pcs, Kg …); "" = pcs. */
   unit: string;
+  /** PM, RM, PROMO, MRO from the item master; "" = not classified. */
+  kind?: string;
 }
 
 /** One BOM line: component code `c`, name `n`, quantity per 100 finished units `p`. */
@@ -296,6 +386,8 @@ export interface BomLine {
   n: string;
   c: string;
   p: number;
+  /** Qty from the pack size in the item name (the client sheet has none for this line). */
+  d?: boolean;
 }
 
 /** Master data the screens need, served by the API (never compiled into the frontend). */
@@ -313,6 +405,8 @@ export interface ProductMaster {
   vendor: string;
   /** Units per box, derived from the BOM's "box" component where present. */
   boxSize: number | null;
+  /** From the item master (Nail Paint, Lipstick …); "" if not set. */
+  category?: string;
 }
 
 /** Approved supplier with fixed rates — client's "price master". */
@@ -323,6 +417,8 @@ export interface Supplier {
   fromTally: boolean;
   /** Fixed rate per component code. */
   rates: Record<string, number>;
+  /** Items this vendor supplies without a fixed rate (rate typed on the indent / PO). */
+  supplies?: string[];
 }
 
 export interface FlowState {
@@ -349,4 +445,7 @@ export interface FlowState {
   purchaseOrders: PurchaseOrder[];
   tallyPos: TallyPo[];
   poClosures: PoClosure[];
+  debitNotes: DebitNote[];
+  escalationClosures: EscalationClosure[];
+  bomIssues: BomIssue[];
 }

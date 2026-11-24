@@ -62,6 +62,7 @@ export const MIGRATIONS: Migration[] = [
         password_hash        VARCHAR(255) NOT NULL,
         role                 ENUM('gate','store','qc','packing','fgwh','accounts','purchase','security','admin') NOT NULL,
         label                VARCHAR(80)  NOT NULL,
+        full_name            VARCHAR(80)  NOT NULL DEFAULT '',
         active               TINYINT(1)   NOT NULL DEFAULT 1,
         must_change_password TINYINT(1)   NOT NULL DEFAULT 1,
         failed_logins        INT UNSIGNED NOT NULL DEFAULT 0,
@@ -324,6 +325,78 @@ async function indentRate(conn: Connection): Promise<void> {
   }
 }
 
+/** Migration 37: a PO can be rejected (fresh installs have the columns already). */
+async function poRejection(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "purchase_orders", "rejected_at")) {
+    await conn.query(`ALTER TABLE purchase_orders
+      ADD COLUMN rejected_by INT UNSIGNED NULL AFTER approved_at,
+      ADD COLUMN rejected_at DATETIME(3) NULL AFTER rejected_by,
+      ADD COLUMN reject_reason VARCHAR(300) NULL AFTER rejected_at`);
+  }
+  await conn.query(`ALTER TABLE purchase_orders
+    ADD CONSTRAINT fk_po_rejected_by FOREIGN KEY (rejected_by) REFERENCES users (id),
+    ADD CONSTRAINT chk_po_not_both CHECK (approved_by IS NULL OR rejected_at IS NULL)`);
+}
+
+/** Migration 40: the client's item master (Rudra sheet): item kind/category/origin, FG category/brand, vendor codes, bulk codes. */
+async function itemMaster(conn: Connection): Promise<void> {
+  const add: [string, string, string][] = [
+    ["components", "kind", "VARCHAR(8) NOT NULL DEFAULT '' COMMENT 'PM, RM, BULK, PROMO, MRO' AFTER type"],
+    ["components", "category", "VARCHAR(60) NOT NULL DEFAULT '' AFTER kind"],
+    ["components", "origin", "VARCHAR(20) NOT NULL DEFAULT '' AFTER category"],
+    ["products", "category", "VARCHAR(60) NOT NULL DEFAULT '' AFTER fg_code"],
+    ["products", "brand", "VARCHAR(60) NOT NULL DEFAULT '' AFTER category"],
+    ["products", "origin", "VARCHAR(20) NOT NULL DEFAULT '' AFTER brand"],
+    ["suppliers", "vendor_code", "VARCHAR(20) NULL COMMENT 'the client vendor code (V-0076)' AFTER name, ADD UNIQUE KEY uq_vendor_code (vendor_code)"],
+    ["bulk_items", "code", "VARCHAR(16) NULL COMMENT 'item code (RM…) of the chemical' AFTER id, ADD UNIQUE KEY uq_code (code)"],
+  ];
+  for (const [table, column, def] of add) {
+    if (await columnMissing(conn, table, column)) await conn.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${def}`);
+  }
+}
+
+/** Migration 41: where a BOM qty came from — the planning sheet, or the pack size in the item's name. */
+async function bomQtySource(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "bom_lines", "qty_source")) {
+    await conn.query(`ALTER TABLE bom_lines ADD COLUMN qty_source ENUM('SHEET','PACK') NOT NULL DEFAULT 'SHEET'
+      COMMENT 'PACK = from the pack size in the item name (no qty in the client sheet)' AFTER per_100`);
+  }
+}
+
+/** Migration 42: a vendor can be mapped to an item without a fixed rate (the client's sheet names the vendor only). */
+async function vendorItemWithoutRate(conn: Connection): Promise<void> {
+  const [[c]] = await conn.query<RowDataPacket[]>(
+    "SELECT IS_NULLABLE AS n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'supplier_rates' AND COLUMN_NAME = 'rate_enc'",
+  );
+  if (c && c.n === "NO") {
+    await conn.query("ALTER TABLE supplier_rates MODIFY rate_enc VARCHAR(255) NULL COMMENT 'encrypted fixed rate; NULL = vendor supplies it, no fixed rate'");
+  }
+}
+
+/** Migration 39: GST type on a PO (fresh installs have the column already). */
+async function poGstType(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "purchase_orders", "gst_type")) {
+    await conn.query(`ALTER TABLE purchase_orders ADD COLUMN gst_type ENUM('INTRA','INTER') NULL
+      COMMENT 'INTRA = CGST 9% + SGST 9%, INTER = IGST 18%; NULL = before GST' AFTER reject_reason`);
+  }
+}
+
+/** Migration 38: the person's own name, beside the login id (unique) and the label (the job, can repeat). */
+async function userFullName(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "users", "full_name")) {
+    await conn.query("ALTER TABLE users ADD COLUMN full_name VARCHAR(80) NOT NULL DEFAULT '' AFTER label");
+  }
+}
+
+/** Migration 29: an indent names the production request it came from (fresh installs have the column already). */
+async function indentRequestLink(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "purchase_indents", "request_no")) {
+    await conn.query(`ALTER TABLE purchase_indents ADD COLUMN request_no VARCHAR(24) NULL COMMENT 'the production indent request it came from' AFTER po_no,
+      ADD UNIQUE KEY uq_request (request_no)`);
+  }
+  await conn.query("ALTER TABLE purchase_indents ADD CONSTRAINT fk_indent_request FOREIGN KEY (request_no) REFERENCES indent_requests (request_no)");
+}
+
 /** Migration 12 on an existing database: excess beyond the tolerance waits for Purchase. */
 async function gateExcess(conn: Connection): Promise<void> {
   if (await columnMissing(conn, "gate_entry_lines", "excess_qty")) {
@@ -389,6 +462,484 @@ async function onePoNumber(conn: Connection): Promise<void> {
   }
   await conn.query("ALTER TABLE purchase_orders DROP COLUMN tally_po_no");
   if (moved.length) await conn.query("UPDATE app_meta SET v = CAST(v AS UNSIGNED) + 1 WHERE k IN ('state_version', 'resync_version')");
+}
+
+/** Each GRN's latest QC decision: its status and how much of it was accepted (null = all or nothing). */
+const V_GRN_QC_STATUS = `CREATE OR REPLACE SQL SECURITY INVOKER VIEW v_grn_qc_status AS
+    SELECT r.grn_no,
+           COALESCE((SELECT q.status FROM qc_intimations i
+                       JOIN qc_results q ON q.intimation_no = i.intimation_no
+                      WHERE i.grn_no = r.grn_no
+                      ORDER BY q.seq DESC LIMIT 1), 'UNDER_TEST') AS qc_status,
+           (SELECT q.accepted_qty FROM qc_intimations i
+              JOIN qc_results q ON q.intimation_no = i.intimation_no
+             WHERE i.grn_no = r.grn_no
+             ORDER BY q.seq DESC LIMIT 1) AS accepted_qty
+      FROM goods_receipts r`;
+
+/** Purchase's debit note to the vendor for what QC rejected on one GRN. Write-once (stage lock); the rate encrypted. */
+const DEBIT_NOTES = `CREATE TABLE IF NOT EXISTS debit_notes (
+    dn_no       VARCHAR(20)   NOT NULL PRIMARY KEY,
+    ${SEQ},
+    dn_date     DATE          NOT NULL,
+    grn_no      VARCHAR(20)   NOT NULL,
+    ar_no       VARCHAR(20)   NOT NULL,
+    qty         DECIMAL(14,3) NOT NULL,
+    unit        VARCHAR(16)   NOT NULL DEFAULT '',
+    rate_enc    VARCHAR(255)  NOT NULL COMMENT 'encrypted rate per unit',
+    reason      VARCHAR(500)  NOT NULL,
+    raised_by   VARCHAR(80)   NOT NULL,
+    row_version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'state version of the last change',
+    ${AUDIT_COLS},
+    UNIQUE KEY uq_grn (grn_no),
+    KEY ix_row_version (row_version),
+    FOREIGN KEY (grn_no) REFERENCES goods_receipts (grn_no),
+    FOREIGN KEY (ar_no) REFERENCES qc_results (ar_no),
+    CHECK (qty > 0)
+  ) ${T}`;
+
+/** An escalation (a SHORT / EXCESS GRN) closed with its resolution. Write-once (stage lock). */
+const ESCALATION_CLOSURES = `CREATE TABLE IF NOT EXISTS escalation_closures (
+    grn_no      VARCHAR(20)  NOT NULL PRIMARY KEY,
+    ${SEQ},
+    closed_on   DATE         NOT NULL,
+    closed_by   VARCHAR(80)  NOT NULL,
+    resolution  VARCHAR(500) NOT NULL,
+    row_version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'state version of the last change',
+    ${AUDIT_COLS},
+    KEY ix_row_version (row_version),
+    FOREIGN KEY (grn_no) REFERENCES goods_receipts (grn_no)
+  ) ${T}`;
+
+/** Migration 19: escalations of GRNs counted beyond the ±20% tolerance can be closed with a resolution. */
+/** A day's production plan: which products and how many. Re-saving a date replaces its lines. */
+const PRODUCTION_PLANS = `CREATE TABLE IF NOT EXISTS production_plans (
+    plan_date  DATE         NOT NULL PRIMARY KEY,
+    created_by INT UNSIGNED NULL,
+    updated_by INT UNSIGNED NULL,
+    created_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    FOREIGN KEY (created_by) REFERENCES users (id),
+    FOREIGN KEY (updated_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const PRODUCTION_PLAN_LINES = `CREATE TABLE IF NOT EXISTS production_plan_lines (
+    plan_date    DATE              NOT NULL,
+    line_no      SMALLINT UNSIGNED NOT NULL,
+    product_id   INT UNSIGNED      NOT NULL,
+    product_type VARCHAR(40)       NOT NULL DEFAULT '',
+    target_qty   INT UNSIGNED      NOT NULL,
+    PRIMARY KEY (plan_date, line_no),
+    FOREIGN KEY (plan_date) REFERENCES production_plans (plan_date) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products (id),
+    CHECK (target_qty > 0)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/**
+ * A requisition BOM list: the plan of a day frozen with its PM requirement when the PDF is made. Write-once; the
+ * BOM issue slip finds it by its number (BOM-yyyymmdd-nnnn, one running counter).
+ */
+const BOM_DOCUMENTS = `CREATE TABLE IF NOT EXISTS bom_documents (
+    bom_no     VARCHAR(24)  NOT NULL PRIMARY KEY,
+    plan_date  DATE         NOT NULL,
+    created_by INT UNSIGNED NULL,
+    created_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    KEY ix_plan_date (plan_date),
+    FOREIGN KEY (created_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const BOM_DOCUMENT_PRODUCTS = `CREATE TABLE IF NOT EXISTS bom_document_products (
+    bom_no     VARCHAR(24)       NOT NULL,
+    line_no    SMALLINT UNSIGNED NOT NULL,
+    product_id INT UNSIGNED      NOT NULL,
+    target_qty INT UNSIGNED      NOT NULL,
+    PRIMARY KEY (bom_no, line_no),
+    FOREIGN KEY (bom_no) REFERENCES bom_documents (bom_no),
+    FOREIGN KEY (product_id) REFERENCES products (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const BOM_DOCUMENT_LINES = `CREATE TABLE IF NOT EXISTS bom_document_lines (
+    bom_no         VARCHAR(24)       NOT NULL,
+    line_no        SMALLINT UNSIGNED NOT NULL,
+    component_code VARCHAR(16)       NOT NULL,
+    required_qty   DECIMAL(14,3)     NOT NULL,
+    present_qty    DECIMAL(14,3)     NOT NULL COMMENT 'PM stock when the document was made',
+    used_in_skus   VARCHAR(500)      NOT NULL DEFAULT '',
+    PRIMARY KEY (bom_no, line_no),
+    FOREIGN KEY (bom_no) REFERENCES bom_documents (bom_no),
+    FOREIGN KEY (component_code) REFERENCES components (code)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/** A BOM list cancelled before it was issued: it stops holding PM stock and leaves the issue list. Write-once. */
+const BOM_CANCELLATIONS = `CREATE TABLE IF NOT EXISTS bom_cancellations (
+    bom_no     VARCHAR(24)  NOT NULL PRIMARY KEY,
+    reason     VARCHAR(200) NOT NULL,
+    created_by INT UNSIGNED NULL,
+    created_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    FOREIGN KEY (bom_no) REFERENCES bom_documents (bom_no),
+    FOREIGN KEY (created_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/**
+ * The production supervisor's check of an issued BOM list: what actually reached the line, per item (lost =
+ * issued − received). One per BOM number, write-once. Stock is not changed by it (the issue already took it out).
+ */
+const BOM_VERIFICATIONS = `CREATE TABLE IF NOT EXISTS bom_verifications (
+    bom_no      VARCHAR(24)  NOT NULL PRIMARY KEY,
+    verified_by VARCHAR(80)  NOT NULL COMMENT 'the supervisor, as typed',
+    created_by  INT UNSIGNED NULL,
+    created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    FOREIGN KEY (bom_no) REFERENCES bom_issue_slips (bom_no),
+    FOREIGN KEY (created_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const BOM_VERIFICATION_LINES = `CREATE TABLE IF NOT EXISTS bom_verification_lines (
+    bom_no       VARCHAR(24)       NOT NULL,
+    line_no      SMALLINT UNSIGNED NOT NULL COMMENT 'the issue slip line it checks',
+    received_qty DECIMAL(14,3)     NOT NULL,
+    PRIMARY KEY (bom_no, line_no),
+    FOREIGN KEY (bom_no) REFERENCES bom_verifications (bom_no),
+    FOREIGN KEY (bom_no, line_no) REFERENCES bom_issue_lines (bom_no, line_no),
+    CHECK (received_qty >= 0)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/** The day's production report: line-wise output by time slot. Saved as a draft until final-submitted (then locked). */
+const PRODUCTION_REPORTS = `CREATE TABLE IF NOT EXISTS production_reports (
+    report_date DATE         NOT NULL PRIMARY KEY,
+    supervisor  VARCHAR(80)  NOT NULL DEFAULT '',
+    final_at    DATETIME(3)  NULL COMMENT 'final submit: the date is locked from then on',
+    final_by    INT UNSIGNED NULL,
+    created_by  INT UNSIGNED NULL,
+    updated_by  INT UNSIGNED NULL,
+    created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    FOREIGN KEY (final_by) REFERENCES users (id),
+    FOREIGN KEY (created_by) REFERENCES users (id),
+    FOREIGN KEY (updated_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const PRODUCTION_REPORT_LINES = `CREATE TABLE IF NOT EXISTS production_report_lines (
+    report_date  DATE              NOT NULL,
+    row_no       SMALLINT UNSIGNED NOT NULL,
+    floor        VARCHAR(8)        NOT NULL DEFAULT '',
+    line_name    VARCHAR(8)        NOT NULL DEFAULT '',
+    manpower     SMALLINT UNSIGNED NULL,
+    line_leader  VARCHAR(80)       NOT NULL DEFAULT '',
+    product_id   INT UNSIGNED      NOT NULL,
+    product_type VARCHAR(40)       NOT NULL DEFAULT '',
+    stage        VARCHAR(30)       NOT NULL DEFAULT '',
+    target_qty   INT UNSIGNED      NULL,
+    slot         VARCHAR(12)       NOT NULL DEFAULT '',
+    qty_first    INT UNSIGNED      NULL COMMENT '9 am to 1 pm',
+    qty_second   INT UNSIGNED      NULL COMMENT '1 pm to 5 pm',
+    qty_evening  INT UNSIGNED      NULL COMMENT '5 pm to 7 pm',
+    sfg_qty      INT UNSIGNED      NULL COMMENT 'total SFG in shift',
+    downtime_min SMALLINT UNSIGNED NULL,
+    reason       VARCHAR(200)      NOT NULL DEFAULT '',
+    PRIMARY KEY (report_date, row_no),
+    FOREIGN KEY (report_date) REFERENCES production_reports (report_date),
+    FOREIGN KEY (product_id) REFERENCES products (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/** Bulk (chemical mix) items that can be planned. Names typed on a plan that are not here yet are added. */
+const BULK_ITEMS = `CREATE TABLE IF NOT EXISTS bulk_items (
+    id         INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name       VARCHAR(120) NOT NULL,
+    created_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY uq_name (name)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+// shortcut: a starter list from the screenshot — replace with the full list when it arrives
+const BULK_ITEMS_SEED = `INSERT IGNORE INTO bulk_items (name) VALUES
+    ('LB-164 Hydra Lip balm (Mix)'), ('LL-129 LIP GLOSSIP LIP OIL Mix'), ('LL-125 Babe Gloss Lipgloss MIX'),
+    ('APF-Apple Foundation Fine Touch (Mix)'), ('SS-383 Cover Up Liquid Concealer Mix'), ('LS-143 Gel Lipstick Mix'),
+    ('MS-112 Rough Gel Lipstick Mix')`;
+
+/** A day's bulk production plan: which bulk items and how much. Re-saving a date replaces its lines. */
+const BULK_PLANS = `CREATE TABLE IF NOT EXISTS bulk_plans (
+    plan_date  DATE         NOT NULL PRIMARY KEY,
+    created_by INT UNSIGNED NULL,
+    updated_by INT UNSIGNED NULL,
+    created_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    FOREIGN KEY (created_by) REFERENCES users (id),
+    FOREIGN KEY (updated_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const BULK_PLAN_LINES = `CREATE TABLE IF NOT EXISTS bulk_plan_lines (
+    plan_date    DATE              NOT NULL,
+    line_no      SMALLINT UNSIGNED NOT NULL,
+    bulk_item_id INT UNSIGNED      NOT NULL,
+    qty          DECIMAL(12,3)     NOT NULL,
+    PRIMARY KEY (plan_date, line_no),
+    FOREIGN KEY (plan_date) REFERENCES bulk_plans (plan_date) ON DELETE CASCADE,
+    FOREIGN KEY (bulk_item_id) REFERENCES bulk_items (id),
+    CHECK (qty > 0)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/** A day's bulk manufacturing report: the actual batches made. Draft until final-submitted (then locked → Quality Testing). */
+const BULK_REPORTS = `CREATE TABLE IF NOT EXISTS bulk_reports (
+    report_date DATE         NOT NULL PRIMARY KEY,
+    final_at    DATETIME(3)  NULL COMMENT 'final submit: the date is locked from then on',
+    final_by    INT UNSIGNED NULL,
+    created_by  INT UNSIGNED NULL,
+    updated_by  INT UNSIGNED NULL,
+    created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    FOREIGN KEY (final_by) REFERENCES users (id),
+    FOREIGN KEY (created_by) REFERENCES users (id),
+    FOREIGN KEY (updated_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const BULK_REPORT_LINES = `CREATE TABLE IF NOT EXISTS bulk_report_lines (
+    report_date  DATE              NOT NULL,
+    row_no       SMALLINT UNSIGNED NOT NULL,
+    bulk_item_id INT UNSIGNED      NOT NULL,
+    shade        VARCHAR(80)       NOT NULL DEFAULT '',
+    order_date   DATE              NULL,
+    responsible  VARCHAR(80)       NOT NULL DEFAULT '',
+    batch_size   DECIMAL(12,3)     NULL COMMENT 'planned, in the item''s unit',
+    actual_qty   DECIMAL(12,3)     NULL COMMENT 'made, in the item''s unit',
+    mfg_by       VARCHAR(80)       NOT NULL DEFAULT '',
+    remark       VARCHAR(200)      NOT NULL DEFAULT '',
+    PRIMARY KEY (report_date, row_no),
+    FOREIGN KEY (report_date) REFERENCES bulk_reports (report_date),
+    FOREIGN KEY (bulk_item_id) REFERENCES bulk_items (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/** Quality Testing of a final-submitted bulk row: accepted (qty → bulk stock), rejected, or on hold until re-tested. */
+const BULK_QT = `CREATE TABLE IF NOT EXISTS bulk_qt (
+    report_date  DATE                                  NOT NULL,
+    row_no       SMALLINT UNSIGNED                     NOT NULL,
+    status       ENUM('ACCEPTED','REJECTED','HOLD')    NOT NULL,
+    accepted_qty DECIMAL(12,3)                         NULL COMMENT 'into bulk stock; 0 when rejected, NULL on hold',
+    remarks      VARCHAR(200)                          NOT NULL DEFAULT '',
+    decided_by   VARCHAR(80)                           NOT NULL DEFAULT '',
+    decided_at   DATETIME(3)                           NOT NULL,
+    PRIMARY KEY (report_date, row_no),
+    FOREIGN KEY (report_date, row_no) REFERENCES bulk_report_lines (report_date, row_no)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/** FG transfer note rows being filled for a date; re-saved whole, cleared when the note is final-submitted. */
+const FG_TRANSFER_DRAFTS = `CREATE TABLE IF NOT EXISTS fg_transfer_drafts (
+    note_date  DATE         NOT NULL PRIMARY KEY,
+    updated_by INT UNSIGNED NULL,
+    updated_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    FOREIGN KEY (updated_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const FG_TRANSFER_DRAFT_LINES = `CREATE TABLE IF NOT EXISTS fg_transfer_draft_lines (
+    note_date    DATE              NOT NULL,
+    row_no       SMALLINT UNSIGNED NOT NULL,
+    product_id   INT UNSIGNED      NOT NULL,
+    product_type VARCHAR(160)      NOT NULL DEFAULT '',
+    qty_in_box   INT UNSIGNED      NULL,
+    total_box    INT UNSIGNED      NULL,
+    pallet_no    VARCHAR(20)       NOT NULL DEFAULT '',
+    supervisor   VARCHAR(80)       NOT NULL DEFAULT '',
+    PRIMARY KEY (note_date, row_no),
+    FOREIGN KEY (note_date) REFERENCES fg_transfer_drafts (note_date) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/** A final-submitted FG transfer note (FTN-yyyymmdd-nnnn, one running counter). Write-once; a date can have several. */
+const FG_TRANSFER_NOTES = `CREATE TABLE IF NOT EXISTS fg_transfer_notes (
+    note_no    VARCHAR(24)  NOT NULL PRIMARY KEY,
+    note_date  DATE         NOT NULL,
+    created_by INT UNSIGNED NULL,
+    created_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    KEY ix_date (note_date),
+    FOREIGN KEY (created_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/** The FG warehouse's count of a note: who verified it; the note is RECEIVED from then on. Write-once. */
+const FG_TRANSFER_RECEIPTS = `CREATE TABLE IF NOT EXISTS fg_transfer_receipts (
+    note_no     VARCHAR(24)  NOT NULL PRIMARY KEY,
+    verified_by VARCHAR(80)  NOT NULL,
+    created_by  INT UNSIGNED NULL,
+    created_at  DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    FOREIGN KEY (note_no) REFERENCES fg_transfer_notes (note_no),
+    FOREIGN KEY (created_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const FG_TRANSFER_RECEIPT_LINES = `CREATE TABLE IF NOT EXISTS fg_transfer_receipt_lines (
+    note_no      VARCHAR(24)       NOT NULL,
+    row_no       SMALLINT UNSIGNED NOT NULL,
+    verified_qty INT UNSIGNED      NOT NULL,
+    remark       VARCHAR(200)      NOT NULL DEFAULT '',
+    PRIMARY KEY (note_no, row_no),
+    FOREIGN KEY (note_no) REFERENCES fg_transfer_receipts (note_no),
+    FOREIGN KEY (note_no, row_no) REFERENCES fg_transfer_note_lines (note_no, row_no)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const FG_TRANSFER_NOTE_LINES = `CREATE TABLE IF NOT EXISTS fg_transfer_note_lines (
+    note_no      VARCHAR(24)       NOT NULL,
+    row_no       SMALLINT UNSIGNED NOT NULL,
+    product_id   INT UNSIGNED      NOT NULL,
+    product_type VARCHAR(160)      NOT NULL DEFAULT '',
+    qty_in_box   INT UNSIGNED      NULL,
+    total_box    INT UNSIGNED      NULL,
+    pallet_no    VARCHAR(20)       NOT NULL DEFAULT '',
+    supervisor   VARCHAR(80)       NOT NULL DEFAULT '',
+    PRIMARY KEY (note_no, row_no),
+    FOREIGN KEY (note_no) REFERENCES fg_transfer_notes (note_no),
+    FOREIGN KEY (product_id) REFERENCES products (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/**
+ * A request from production to buy one PM item that is short. Store verifies it, Purchase turns a verified one into a
+ * purchase indent (purchase_indents.request_no). One OPEN request per item: open until rejected or its indent is on a PO.
+ */
+/**
+ * MRN against an issued BOM list: the supervisor sends PM back to Store (returned qty); Store counts what came in
+ * (received qty) and approves — the received qty goes back into PM stock. Approved once, never changed after.
+ */
+const BOM_RETURNS = `CREATE TABLE IF NOT EXISTS bom_returns (
+    mrn_no         VARCHAR(24)  NOT NULL PRIMARY KEY,
+    bom_no         VARCHAR(24)  NOT NULL,
+    returned_by    VARCHAR(80)  NOT NULL COMMENT 'the supervisor, as picked',
+    remarks        VARCHAR(200) NOT NULL DEFAULT '',
+    status         ENUM('PENDING','APPROVED') NOT NULL DEFAULT 'PENDING',
+    verified_by    VARCHAR(80)  NOT NULL DEFAULT '' COMMENT 'the store login that approved',
+    verify_remarks VARCHAR(200) NOT NULL DEFAULT '',
+    verified_at    DATETIME(3)  NULL,
+    created_by     INT UNSIGNED NULL,
+    created_at     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    KEY ix_bom (bom_no),
+    FOREIGN KEY (bom_no) REFERENCES bom_issue_slips (bom_no),
+    FOREIGN KEY (created_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const BOM_RETURN_LINES = `CREATE TABLE IF NOT EXISTS bom_return_lines (
+    mrn_no         VARCHAR(24)       NOT NULL,
+    line_no        SMALLINT UNSIGNED NOT NULL,
+    component_code VARCHAR(16)       NOT NULL,
+    returned_qty   DECIMAL(14,3)     NOT NULL COMMENT 'what the supervisor says is coming back',
+    received_qty   DECIMAL(14,3)     NULL COMMENT 'what Store counted, at approval',
+    remark         VARCHAR(200)      NOT NULL DEFAULT '',
+    PRIMARY KEY (mrn_no, line_no),
+    FOREIGN KEY (mrn_no) REFERENCES bom_returns (mrn_no),
+    FOREIGN KEY (component_code) REFERENCES components (code),
+    CHECK (returned_qty > 0),
+    CHECK (received_qty IS NULL OR received_qty >= 0)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const INDENT_REQUESTS = `CREATE TABLE IF NOT EXISTS indent_requests (
+    request_no     VARCHAR(24)  NOT NULL PRIMARY KEY,
+    component_code VARCHAR(16)  NOT NULL,
+    qty            INT UNSIGNED NOT NULL,
+    required_date  DATE         NULL,
+    supervisor     VARCHAR(80)  NOT NULL DEFAULT '',
+    remarks        VARCHAR(200) NOT NULL DEFAULT '',
+    raised_by      VARCHAR(80)  NOT NULL COMMENT 'name of the login that raised it',
+    created_by     INT UNSIGNED NULL,
+    created_at     DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    status         ENUM('PENDING','VERIFIED','REJECTED') NOT NULL DEFAULT 'PENDING',
+    verify_remarks VARCHAR(200) NOT NULL DEFAULT '',
+    verified_by    VARCHAR(80)  NOT NULL DEFAULT '',
+    verified_at    DATETIME(3)  NULL,
+    KEY ix_code (component_code),
+    FOREIGN KEY (component_code) REFERENCES components (code),
+    FOREIGN KEY (created_by) REFERENCES users (id),
+    CHECK (qty > 0)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/** Store's issue against a BOM list: what was actually given per PM item. One per BOM number, write-once. */
+const BOM_ISSUE_SLIPS = `CREATE TABLE IF NOT EXISTS bom_issue_slips (
+    bom_no     VARCHAR(24)  NOT NULL PRIMARY KEY,
+    ${SEQ},
+    filled_by  VARCHAR(80)  NOT NULL COMMENT 'the store person, as typed',
+    row_version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'state version of the last change',
+    created_by INT UNSIGNED NULL,
+    created_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_by INT UNSIGNED NULL,
+    updated_at DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    KEY ix_row_version (row_version),
+    FOREIGN KEY (bom_no) REFERENCES bom_documents (bom_no),
+    FOREIGN KEY (created_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+const BOM_ISSUE_LINES = `CREATE TABLE IF NOT EXISTS bom_issue_lines (
+    bom_no         VARCHAR(24)       NOT NULL,
+    line_no        SMALLINT UNSIGNED NOT NULL,
+    component_code VARCHAR(16)       NOT NULL,
+    required_qty   DECIMAL(14,3)     NOT NULL,
+    issued_qty     DECIMAL(14,3)     NOT NULL,
+    remark         VARCHAR(200)      NOT NULL DEFAULT '',
+    PRIMARY KEY (bom_no, line_no),
+    FOREIGN KEY (bom_no) REFERENCES bom_issue_slips (bom_no),
+    FOREIGN KEY (component_code) REFERENCES components (code),
+    CHECK (issued_qty >= 0)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/** Migration 23: BOM issue slips count as issued PM stock, so they become a register screens keep up to date. */
+async function bomIssueRegister(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "bom_issue_slips", "row_version")) {
+    await conn.query(`ALTER TABLE bom_issue_slips
+      ADD COLUMN seq BIGINT UNSIGNED NOT NULL AUTO_INCREMENT AFTER bom_no,
+      ADD UNIQUE KEY uq_seq (seq),
+      ADD COLUMN row_version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'state version of the last change',
+      ADD COLUMN updated_by INT UNSIGNED NULL,
+      ADD COLUMN updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+      ADD KEY ix_row_version (row_version)`);
+  }
+}
+
+async function escalations(conn: Connection): Promise<void> {
+  await conn.query(ESCALATION_CLOSURES);
+}
+
+/**
+ * Migration 18: QC can accept part of a lot — the rest is rejected and Purchase raises a debit note for it.
+ */
+async function partialQc(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "qc_results", "accepted_qty")) {
+    await conn.query(`ALTER TABLE qc_results
+      ADD COLUMN accepted_qty DECIMAL(14,3) NULL COMMENT 'approved: the part accepted (the rest rejected → debit note); rejected: 0' AFTER remark`);
+  }
+  await conn.query(V_GRN_QC_STATUS);
+  await conn.query(DEBIT_NOTES);
+  await conn.query("INSERT IGNORE INTO document_sequences (series, last_no) VALUES ('DN', 0)");
+}
+
+/** One photo per gate entry, written once (also in the fresh schema: older migrations read the gate register). */
+const GATE_ENTRY_PHOTOS = `CREATE TABLE IF NOT EXISTS gate_entry_photos (
+    gate_entry_no VARCHAR(20)  NOT NULL PRIMARY KEY,
+    mime          VARCHAR(40)  NOT NULL,
+    bytes         MEDIUMBLOB   NOT NULL,
+    taken_at      DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    created_by    INT UNSIGNED NULL,
+    FOREIGN KEY (gate_entry_no) REFERENCES gate_entries (gate_entry_no),
+    FOREIGN KEY (created_by) REFERENCES users (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`;
+
+/**
+ * Migration 17: the gate becomes a manual record (driver, invoice qty with its unit, one photo); the PO is picked
+ * at GRN, so a GRN carries its own PO and item, and its count against what was pending (±20% tolerance).
+ */
+async function manualGate(conn: Connection): Promise<void> {
+  if (await columnMissing(conn, "gate_entries", "invoice_qty_unit")) {
+    await conn.query(`ALTER TABLE gate_entries
+      MODIFY invoice_qty DECIMAL(14,3) NULL,
+      ADD COLUMN invoice_qty_unit VARCHAR(20) NOT NULL DEFAULT '' COMMENT 'Box, Kg or as typed at the gate' AFTER invoice_qty,
+      ADD COLUMN driver_name VARCHAR(80) NOT NULL DEFAULT '' AFTER vehicle_no_enc,
+      ADD COLUMN driver_phone_enc VARCHAR(255) NULL AFTER driver_name`);
+  }
+  await conn.query(GATE_ENTRY_PHOTOS);
+  if (await columnMissing(conn, "goods_receipts", "po_item_name")) {
+    await conn.query(`ALTER TABLE goods_receipts
+      ADD COLUMN po_no VARCHAR(20) NULL COMMENT 'PO picked at GRN (raised in the app)' AFTER gate_line_no,
+      ADD COLUMN tally_po_no VARCHAR(40) NULL COMMENT 'PO picked at GRN (made in Tally)' AFTER po_no,
+      ADD COLUMN po_item_name VARCHAR(160) NOT NULL DEFAULT '' COMMENT 'the PO item this GRN counts' AFTER tally_po_no,
+      ADD COLUMN po_item_code VARCHAR(16) NOT NULL DEFAULT '' AFTER po_item_name,
+      ADD COLUMN pending_before DECIMAL(14,3) NULL COMMENT 'pending on the PO item before this GRN' AFTER po_item_code,
+      ADD COLUMN variance VARCHAR(10) NOT NULL DEFAULT '' COMMENT 'SHORT / EXCESS beyond the tolerance' AFTER pending_before,
+      ADD COLUMN closes_item TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'completes its PO item' AFTER variance,
+      ADD FOREIGN KEY (po_no) REFERENCES purchase_orders (po_no),
+      ADD FOREIGN KEY (tally_po_no) REFERENCES tally_purchase_orders (po_no),
+      ADD CHECK (variance IN ('', 'SHORT', 'EXCESS')),
+      ADD CHECK (po_no IS NULL OR tally_po_no IS NULL)`);
+  }
 }
 
 export const RELATIONAL_TABLES: string[] = [
@@ -475,6 +1026,10 @@ export const RELATIONAL_TABLES: string[] = [
     expected_date DATE         NULL,
     approved_by   INT UNSIGNED NULL COMMENT 'set = APPROVED',
     approved_at   DATETIME(3)  NULL,
+    rejected_by   INT UNSIGNED NULL COMMENT 'set = REJECTED by the owner',
+    rejected_at   DATETIME(3)  NULL,
+    reject_reason VARCHAR(300) NULL,
+    gst_type      ENUM('INTRA','INTER') NULL COMMENT 'INTRA = CGST 9% + SGST 9%, INTER = IGST 18%; NULL = before GST',
     tally_push_at    DATETIME     NULL COMMENT 'last attempt to create it in Tally',
     tally_push_error VARCHAR(500) NULL COMMENT 'why Tally did not take it (empty = created)',
     ${AUDIT_COLS},
@@ -503,6 +1058,8 @@ export const RELATIONAL_TABLES: string[] = [
     supplier_id    INT UNSIGNED NULL COMMENT 'the vendor this indent is to be bought from',
     rate_enc       VARCHAR(255) NULL COMMENT 'encrypted expected rate per unit (carried onto the PO line)',
     po_no          VARCHAR(20)  NULL COMMENT 'set = PO_RAISED',
+    request_no     VARCHAR(24)  NULL COMMENT 'the production indent request it came from',
+    UNIQUE KEY uq_request (request_no),
     ${AUDIT_COLS},
     FOREIGN KEY (component_code) REFERENCES components (code),
     FOREIGN KEY (supplier_id) REFERENCES suppliers (id),
@@ -541,6 +1098,7 @@ export const RELATIONAL_TABLES: string[] = [
     CHECK ((po_no IS NOT NULL) + (external_po_ref IS NOT NULL) + (tally_po_no IS NOT NULL) <= 1)
   ) ${T}`,
   GATE_ENTRY_LINES,
+  GATE_ENTRY_PHOTOS,
   TALLY_ITEMS,
   PO_CLOSURES,
   `CREATE TABLE IF NOT EXISTS goods_receipts (
@@ -594,6 +1152,7 @@ export const RELATIONAL_TABLES: string[] = [
     decided_on    DATE         NOT NULL,
     status        ENUM('APPROVED','HOLD','REJECTED') NOT NULL,
     remark        VARCHAR(500) NOT NULL DEFAULT '',
+    accepted_qty  DECIMAL(14,3) NULL COMMENT 'approved: the part accepted (the rest rejected → debit note); rejected: 0',
     ${AUDIT_COLS},
     KEY ix_intimation (intimation_no, seq),
     FOREIGN KEY (intimation_no) REFERENCES qc_intimations (intimation_no)
@@ -753,13 +1312,16 @@ export const RELATIONAL_TABLES: string[] = [
   ) ${T}`,
 
   /* derived value: the QC status of a GRN is its latest A.R. decision */
-  `CREATE OR REPLACE SQL SECURITY INVOKER VIEW v_grn_qc_status AS
-    SELECT r.grn_no,
-           COALESCE((SELECT q.status FROM qc_intimations i
-                       JOIN qc_results q ON q.intimation_no = i.intimation_no
-                      WHERE i.grn_no = r.grn_no
-                      ORDER BY q.seq DESC LIMIT 1), 'UNDER_TEST') AS qc_status
-      FROM goods_receipts r`,
+  V_GRN_QC_STATUS,
+  DEBIT_NOTES,
+  ESCALATION_CLOSURES,
+  // a register (loaded with the state) — so here too, for the migrations that read every register
+  BOM_DOCUMENTS,
+  BOM_CANCELLATIONS,
+  BOM_ISSUE_SLIPS,
+  BOM_ISSUE_LINES,
+  BOM_RETURNS,
+  BOM_RETURN_LINES,
 ];
 
 MIGRATIONS.push(
@@ -847,6 +1409,171 @@ MIGRATIONS.push(
     statements: [],
     run: onePoNumber,
   },
+  {
+    version: 17,
+    name: "manual gate entry (driver, qty unit, photo); PO and ±20% tolerance at GRN",
+    statements: [],
+    run: manualGate,
+  },
+  {
+    version: 18,
+    name: "QC accepts part of a lot; debit notes for the rejected part",
+    statements: [],
+    run: partialQc,
+  },
+  {
+    version: 19,
+    name: "escalations (SHORT / EXCESS GRNs) closed with a resolution",
+    statements: [],
+    run: escalations,
+  },
+  {
+    version: 20,
+    name: "production plans: products and target qty per day",
+    statements: [PRODUCTION_PLANS, PRODUCTION_PLAN_LINES],
+  },
+  {
+    version: 21,
+    name: "requisition BOM lists: a plan's PM requirement frozen under a BOM number",
+    statements: [BOM_DOCUMENTS, BOM_DOCUMENT_PRODUCTS, BOM_DOCUMENT_LINES, "INSERT IGNORE INTO document_sequences (series, last_no) VALUES ('BOM', 0)"],
+  },
+  {
+    version: 22,
+    name: "BOM issue slips: what Store actually gave against a BOM list",
+    statements: [BOM_ISSUE_SLIPS, BOM_ISSUE_LINES],
+  },
+  {
+    version: 23,
+    name: "BOM issue slips take PM out of stock (a register like requisitions)",
+    statements: [],
+    run: bomIssueRegister,
+  },
+  {
+    version: 24,
+    name: "open BOM lists hold PM stock (soft reservation); a BOM list can be cancelled",
+    statements: [BOM_CANCELLATIONS],
+  },
+  {
+    version: 25,
+    name: "supervisor BOM verification: what reached the line per issued BOM list",
+    statements: [BOM_VERIFICATIONS, BOM_VERIFICATION_LINES],
+  },
+  {
+    version: 26,
+    name: "production report: line-wise output per day, draft then final submit",
+    statements: [PRODUCTION_REPORTS, PRODUCTION_REPORT_LINES],
+  },
+  {
+    version: 27,
+    name: "bulk production plan: bulk item list and a plan per day",
+    statements: [BULK_ITEMS, BULK_ITEMS_SEED, BULK_PLANS, BULK_PLAN_LINES],
+  },
+  {
+    version: 28,
+    name: "FG transfer note: draft rows per date, final submit makes a numbered note",
+    statements: [FG_TRANSFER_DRAFTS, FG_TRANSFER_DRAFT_LINES, FG_TRANSFER_NOTES, FG_TRANSFER_NOTE_LINES, "INSERT IGNORE INTO document_sequences (series, last_no) VALUES ('FTN', 0)"],
+  },
+  {
+    version: 29,
+    name: "indent requests from production: fixed indent qty per item, request -> store verify -> purchase indent",
+    statements: [
+      INDENT_REQUESTS,
+      "INSERT IGNORE INTO document_sequences (series, last_no) VALUES ('IR', 0)",
+      "ALTER TABLE components ADD COLUMN indent_qty INT UNSIGNED NULL COMMENT 'the fixed qty this item is ordered in'",
+    ],
+    run: indentRequestLink,
+  },
+  {
+    version: 30,
+    name: "MRN against a BOM list: supervisor returns PM, Store approves the received qty back into stock",
+    statements: [BOM_RETURNS, BOM_RETURN_LINES, "INSERT IGNORE INTO document_sequences (series, last_no) VALUES ('MRB', 0)"],
+  },
+  {
+    version: 31,
+    name: "production report: supervisor on each row (the report's one supervisor copied onto its rows)",
+    statements: [
+      "ALTER TABLE production_report_lines ADD COLUMN supervisor VARCHAR(80) NOT NULL DEFAULT '' AFTER line_leader",
+      "UPDATE production_report_lines l JOIN production_reports r ON r.report_date = l.report_date SET l.supervisor = r.supervisor",
+    ],
+  },
+  {
+    version: 32,
+    name: "bulk: unit (Kg or L) per bulk item; bulk manufacturing report per day",
+    statements: [
+      "ALTER TABLE bulk_items ADD COLUMN unit ENUM('KG','L') NOT NULL DEFAULT 'KG'",
+      // shortcut: demo guess for the starter list (liquids in L) — the real list brings its own units
+      "UPDATE bulk_items SET unit = 'L' WHERE name LIKE '%Lip oil%' OR name LIKE '%Foundation%' OR name LIKE '%Liquid%'",
+      BULK_REPORTS,
+      BULK_REPORT_LINES,
+    ],
+  },
+  {
+    version: 33,
+    name: "bulk quality testing: accept / reject / hold each final-submitted bulk row; accepted qty is bulk stock",
+    statements: [BULK_QT],
+  },
+  {
+    version: 34,
+    name: "FG transfer verify: the FG warehouse's count of a note marks it received",
+    statements: [FG_TRANSFER_RECEIPTS, FG_TRANSFER_RECEIPT_LINES],
+  },
+  {
+    version: 35,
+    name: "FG transfer note: total qty typed per row (defaults to qty in box x total box)",
+    statements: [
+      "ALTER TABLE fg_transfer_draft_lines ADD COLUMN total_qty INT UNSIGNED NULL AFTER total_box",
+      "ALTER TABLE fg_transfer_note_lines ADD COLUMN total_qty INT UNSIGNED NULL AFTER total_box",
+      "UPDATE fg_transfer_draft_lines SET total_qty = qty_in_box * total_box WHERE qty_in_box IS NOT NULL AND total_box IS NOT NULL",
+      "UPDATE fg_transfer_note_lines SET total_qty = qty_in_box * total_box WHERE qty_in_box IS NOT NULL AND total_box IS NOT NULL",
+    ],
+  },
+  {
+    version: 36,
+    name: "debit notes for short supply: raised from a SHORT escalation (no QC record), one of each kind per GRN",
+    statements: [
+      `ALTER TABLE debit_notes
+         ADD COLUMN kind ENUM('QC_REJECTED','SHORT_SUPPLY') NOT NULL DEFAULT 'QC_REJECTED' AFTER grn_no,
+         MODIFY ar_no VARCHAR(20) NULL COMMENT 'the QC result debited; NULL on a short-supply note',
+         ADD UNIQUE KEY uq_grn_kind (grn_no, kind),
+         DROP INDEX uq_grn`,
+    ],
+  },
+  {
+    version: 37,
+    name: "PO rejection by the owner: who, when, why; its indents open again",
+    statements: [],
+    run: poRejection,
+  },
+  {
+    version: 38,
+    name: "users get a full name (the person), separate from the label (the job)",
+    statements: [],
+    run: userFullName,
+  },
+  {
+    version: 39,
+    name: "GST on POs: same state (CGST + SGST) or other state (IGST)",
+    statements: [],
+    run: poGstType,
+  },
+  {
+    version: 40,
+    name: "item master: kind/category/origin on items, category/brand on FG, vendor codes, bulk codes",
+    statements: [],
+    run: itemMaster,
+  },
+  {
+    version: 41,
+    name: "BOM qty source: planning sheet or pack size",
+    statements: [],
+    run: bomQtySource,
+  },
+  {
+    version: 42,
+    name: "vendor ↔ item mapping without a fixed rate",
+    statements: [],
+    run: vendorItemWithoutRate,
+  },
 );
 
 /* ── privileges of the runtime app account ──────────────────────────────────── */
@@ -874,6 +1601,12 @@ export const BUSINESS_TABLES = [
   "order_lines",
   "dispatch_slips",
   "dispatch_lines",
+  "debit_notes",
+  "escalation_closures",
+  "bom_issue_slips",
+  "bom_issue_lines",
+  "bom_returns",
+  "bom_return_lines",
 ];
 
 /**
@@ -903,6 +1636,37 @@ export function appGrants(allowReset: boolean): { table: string; privileges: str
     { table: "production_batches", privileges: addOnly },
     { table: "stock_settings", privileges: allowReset ? "SELECT, INSERT, UPDATE, DELETE" : "SELECT" },
     { table: "v_grn_qc_status", privileges: "SELECT" },
+    // One photo per gate entry, written once.
+    { table: "gate_entry_photos", privileges: addOnly },
+    // A plan is re-saved whole: its lines are replaced.
+    { table: "production_plans", privileges: "SELECT, INSERT, UPDATE" },
+    { table: "production_plan_lines", privileges: "SELECT, INSERT, DELETE" },
+    // A BOM list is written once, never changed.
+    { table: "bom_documents", privileges: "SELECT, INSERT" },
+    { table: "bom_document_products", privileges: "SELECT, INSERT" },
+    { table: "bom_document_lines", privileges: "SELECT, INSERT" },
+    { table: "bom_cancellations", privileges: "SELECT, INSERT" },
+    { table: "bom_verifications", privileges: "SELECT, INSERT" },
+    { table: "bom_verification_lines", privileges: "SELECT, INSERT" },
+    // A draft report is re-saved whole (its rows replaced) until final submit locks it.
+    { table: "production_reports", privileges: "SELECT, INSERT, UPDATE" },
+    { table: "production_report_lines", privileges: "SELECT, INSERT, DELETE" },
+    // New bulk names typed on a plan join the list; a bulk plan is re-saved whole.
+    { table: "bulk_items", privileges: "SELECT, INSERT" },
+    { table: "bulk_plans", privileges: "SELECT, INSERT, UPDATE" },
+    { table: "bulk_plan_lines", privileges: "SELECT, INSERT, DELETE" },
+    { table: "bulk_reports", privileges: "SELECT, INSERT, UPDATE" },
+    { table: "bulk_report_lines", privileges: "SELECT, INSERT, DELETE" },
+    { table: "bulk_qt", privileges: "SELECT, INSERT, UPDATE" },
+    // FG transfer: the draft is re-saved whole and cleared on final submit; a note is written once.
+    { table: "fg_transfer_drafts", privileges: "SELECT, INSERT, UPDATE, DELETE" },
+    { table: "fg_transfer_draft_lines", privileges: "SELECT, INSERT, DELETE" },
+    { table: "fg_transfer_notes", privileges: "SELECT, INSERT" },
+    { table: "fg_transfer_note_lines", privileges: "SELECT, INSERT" },
+    { table: "fg_transfer_receipts", privileges: "SELECT, INSERT" },
+    { table: "fg_transfer_receipt_lines", privileges: "SELECT, INSERT" },
+    // Store's verify updates a request once; it is never deleted.
+    { table: "indent_requests", privileges: "SELECT, INSERT, UPDATE" },
     // One row per series, locked only while a document of that series is being created.
     { table: "document_sequences", privileges: "SELECT, UPDATE" },
     ...BUSINESS_TABLES.map((table) => ({ table, privileges: register })),

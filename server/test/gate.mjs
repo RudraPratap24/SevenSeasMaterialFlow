@@ -1,5 +1,5 @@
-// Gate in against Tally purchase orders: import (read only), search data, item-wise check-in,
-// partial delivery keeping the PO open, vehicle out — on the server and in the database.
+// The gate register as a manual record: the vehicle and its paper (supplier, invoice, qty + unit, driver), one
+// photo, server date/time in, vehicle out — no PO at the gate (Store picks it at GRN). Plus the Tally PO import.
 // Requires a DEVELOPMENT database with --dev-passwords and the demo data loaded (npm run db:demo).
 // Usage: node server/test/gate.mjs [baseUrl]
 import "dotenv/config";
@@ -15,16 +15,17 @@ const check = (n, c, x = "") => (c ? (pass++, console.log("  ok  ", n)) : (fail+
 
 function client() {
   let cookie = "";
-  return async (method, path, body) => {
+  return async (method, path, body, type = "application/json") => {
     const res = await fetch(BASE + path, {
       method,
-      headers: { "content-type": "application/json", "x-flow-request": "1", ...(cookie ? { cookie } : {}) },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: { "content-type": type, "x-flow-request": "1", ...(cookie ? { cookie } : {}) },
+      body: body === undefined ? undefined : type === "application/json" ? JSON.stringify(body) : body,
     });
     for (const sc of res.headers.getSetCookie()) cookie = sc.split(";")[0];
+    const raw = Buffer.from(await res.arrayBuffer());
     let json = null;
-    try { json = await res.json(); } catch {}
-    return { status: res.status, json };
+    try { json = JSON.parse(raw.toString("utf8")); } catch {}
+    return { status: res.status, json, raw, type: res.headers.get("content-type") ?? "" };
   };
 }
 const login = async (u) => {
@@ -58,89 +59,97 @@ check("a PO with a quantity it cannot read is skipped and named (never guessed);
   refusedImport.ok && new RegExp(`${PO}: .*APF STICKER`).test(refusedImport.out) && /1 unchanged/.test(refusedImport.out), refusedImport.out);
 
 const gate = await login("gate");
-const state = async () => (await gate("GET", "/api/state")).json.state;
-const s0 = await state();
+const store = await login("store");
+const s0 = (await store("GET", "/api/state")).json.state;
 const po = s0.tallyPos.find((p) => p.poNo === PO);
 const item = (name) => po?.lines.find((l) => l.itemName === name);
-check("the gate sees the PO, supplier name decoded", po?.supplierName === "Test Packaging & Co", JSON.stringify(po));
+check("Store sees the PO (it picks it at GRN), supplier name decoded", po?.supplierName === "Test Packaging & Co", JSON.stringify(po));
 check("one row per item; the same item twice on the PO is merged", po?.lines.length === 3 && item("APF CAP")?.qty === 7000, JSON.stringify(po?.lines));
 check("units and decimals exactly as in Tally", item("APF STICKER")?.qty === 12.5 && item("APF STICKER")?.unit === "Kg" && item("6 ML EYE LINER box 12pcs")?.unit === "Pcs", JSON.stringify(po?.lines));
 check("PMS code from the component master", item("APF CAP")?.itemCode === "PMS0002", item("APF CAP")?.itemCode);
 check("the cancelled PO is marked cancelled", s0.tallyPos.find((p) => p.poNo === CANCELLED)?.cancelled === true);
 check("the Sales voucher is ignored", !s0.tallyPos.some((p) => p.poNo === "S-1"));
-const store = await login("store");
-check("other departments do not receive the Tally POs", (await store("GET", "/api/state")).json.state.tallyPos.length === 0);
+const g0 = (await gate("GET", "/api/state")).json.state;
+check("the gate gets no POs any more — only its register (and which entries have their GRN)", g0.tallyPos.length === 0 && g0.purchaseOrders.length === 0);
+
+console.log("the vendor list for the supplier dropdown");
+const vendors = (await gate("GET", "/api/vendors")).json?.vendors ?? [];
+const MAX = "MAXCOMM INDIA PVT LTD";
+check("the gate gets vendor names (no rates)", vendors.includes(MAX) && typeof vendors[0] === "string", JSON.stringify(vendors.slice(0, 3)));
+check("other departments don't need it", (await store("GET", "/api/vendors")).status === 403);
 
 const inv = () => `T-${run}-${Math.random().toString(36).slice(2, 7)}`;
 const entry = (over = {}) => ({
-  date: "", supplierName: "", productDesc: "", invoiceNo: inv(), invoiceDate: "", poNo: PO, invoiceQty: null,
-  transportName: "", lrNo: "", vehicleNo: "HR55-T-0001", timeIn: "00:00", timeOut: "", driverSign: false, remark: "", lines: [], ...over,
+  supplierName: MAX, invoiceNo: inv(), invoiceDate: "", invoiceQty: 12, invoiceQtyUnit: "Box", transportName: "Blue Dart",
+  lrNo: "LR-1", vehicleNo: "HR55-T-0001", driverName: "Ramesh", driverPhone: "9876543210", ...over,
 });
-const line = (itemName, qty, over = {}) => ({ itemName, itemCode: "", unit: "", qty, remark: "", ...over });
-const refused = async (name, e, pattern) => {
-  const r = await act(gate, "addGateEntry", [e]);
-  check(name, (r.status === 400 || r.status === 409) && (!pattern || pattern.test(r.json?.error ?? "")), `${r.status} ${r.json?.error}`);
+const refused = async (name, e, pattern, who = gate) => {
+  const r = await act(who, "addGateEntry", [e]);
+  check(name, [400, 403, 409].includes(r.status) && (!pattern || pattern.test(r.json?.error ?? "")), `${r.status} ${r.json?.error}`);
 };
 
-console.log("gate in is refused when");
-await refused("the PO is not from Tally", entry({ poNo: "26SEV999X", lines: [line("APF CAP", 1)] }), /not among the purchase orders/);
-await refused("the PO is cancelled in Tally", entry({ poNo: CANCELLED, lines: [line("APF CAP", 1)] }), /cancelled/);
-await refused("no item is ticked", entry(), /at least one item/);
-await refused("an item is not on the PO", entry({ lines: [line("SOMETHING ELSE", 1)] }), /not on PO/);
-await refused("more arrives than is pending (no over-supply accepted)", entry({ lines: [line("APF CAP", 7001)] }), /more than the 7000 Pcs/);
-await refused("a quantity has more than 3 decimals", entry({ lines: [line("APF STICKER", 1.2345)] }), /3 decimals/);
-await refused("items are sent without a PO", entry({ poNo: "", supplierName: "X", productDesc: "x", lines: [line("APF CAP", 1)] }), /against a PO/);
-await refused("no PO and no supplier name", entry({ poNo: "", supplierName: "", productDesc: "caps" }), /Supplier name is required/);
-await refused("no PO and no material", entry({ poNo: "", supplierName: "X", productDesc: "" }), /material is required/);
-await refused("the invoice date is not a real date", entry({ invoiceDate: "31-02-2026", lines: [line("APF CAP", 1)] }), /real date/);
-await refused("the invoice date is after today", entry({ invoiceDate: "01-01-2099", lines: [line("APF CAP", 1)] }), /after today/);
-await refused("the vehicle number is missing", entry({ vehicleNo: "", lines: [line("APF CAP", 1)] }), /vehicleNo/);
-await refused("time in is missing", entry({ timeIn: "", lines: [line("APF CAP", 1)] }), /timeIn/);
-if (new Date().toTimeString().slice(0, 5) < "23:59") {
-  await refused("time in is later than now", entry({ timeIn: "23:59", lines: [line("APF CAP", 1)] }), /later than now/);
-}
+console.log("a gate entry is refused when");
+await refused("the supplier is not an approved vendor", entry({ supplierName: "Nobody Pvt Ltd" }), /not an approved supplier/);
+await refused("the vehicle number is missing", entry({ vehicleNo: "" }), /vehicleNo/);
+await refused("the invoice date is not a real date", entry({ invoiceDate: "31-02-2026" }), /real date/);
+await refused("the invoice date is after today", entry({ invoiceDate: "01-01-2099" }), /after today/);
+await refused("the driver phone is not a phone number", entry({ driverPhone: "12345" }), /10-digit/);
+await refused("a quantity without its unit", entry({ invoiceQtyUnit: "" }), /unit of the quantity/);
+await refused("a quantity with more than 3 decimals", entry({ invoiceQty: 1.2345 }), /3 decimals/);
+await refused("the old PO fields are sent (the gate has no PO now)", { ...entry(), poNo: PO, lines: [] }, /poNo|lines|Unrecognized/i);
+await refused("the screen tries to set the time in", { ...entry(), timeIn: "01:00" }, /timeIn|Unrecognized/i);
+await refused("Store does it", entry(), null, store);
 
-console.log("partial delivery");
-const first = await act(gate, "addGateEntry", [
-  entry({ supplierName: "Typed Wrong", lines: [line("APF CAP", 5000, { itemCode: "HACK", unit: "Box", remark: "2000 Pcs short" })] }),
-]);
+console.log("a gate entry");
+const before = Date.now();
+const first = await act(gate, "addGateEntry", [entry({ invoiceQty: 12.5, invoiceQtyUnit: "Drum" })]);
 const made = first.json?.changes?.gateEntries?.at(-1);
-check("accepted", first.status === 200, JSON.stringify(first.json));
-check("supplier, item code and unit are the PO's, not the screen's", made?.supplierName === "Test Packaging & Co" && made?.lines[0].itemCode === "PMS0002" && made?.lines[0].unit === "Pcs", JSON.stringify(made));
-check("the short remark is kept on the item", made?.lines[0].remark === "2000 Pcs short");
+const nowHm = new Date(before).toTimeString().slice(0, 5);
+check("accepted, numbered by the server", first.status === 200 && /^GE-\d+$/.test(made?.id ?? ""), JSON.stringify(first.json));
+check("date and time in are the server's (today, now)", /^\d{2}-\d{2}-\d{4}$/.test(made?.date) && /^\d{2}:\d{2}$/.test(made?.timeIn) && (made.timeIn >= nowHm || nowHm >= "23:59"), `${made?.date} ${made?.timeIn} vs ${nowHm}`);
+check("no PO, no items; qty with its own unit (typed: Drum, decimals kept)", made?.poNo === "" && made?.lines.length === 0 && made?.invoiceQty === 12.5 && made?.invoiceQtyUnit === "Drum", JSON.stringify(made));
+check("driver name and phone kept; no photo yet", made?.driverName === "Ramesh" && made?.driverPhone === "9876543210" && made?.hasPhoto === false);
 const db = await mysql.createConnection({
   host: process.env.DB_HOST, port: Number(process.env.DB_PORT ?? 3306), user: process.env.DB_USER,
   password: process.env.DB_PASSWORD, database: process.env.DB_NAME,
 });
-const [[row]] = await db.query("SELECT po_no, external_po_ref, tally_po_no FROM gate_entries WHERE gate_entry_no = ?", [made?.id]);
-check("stored as a real link to the Tally PO", row?.tally_po_no === PO && row.po_no === null && row.external_po_ref === null, JSON.stringify(row));
-await refused("more than what is still pending after it", entry({ lines: [line("APF CAP", 2001)] }), /more than the 2000 Pcs/);
-await refused("the same supplier invoice twice", entry({ invoiceNo: made?.invoiceNo, lines: [line("APF CAP", 1)] }), /already in the gate register/);
+const [[row]] = await db.query("SELECT po_no, external_po_ref, tally_po_no, invoice_qty_unit, driver_phone_enc FROM gate_entries WHERE gate_entry_no = ?", [made?.id]);
+check("stored without a PO; the driver phone encrypted at rest", row && row.po_no === null && row.tally_po_no === null && row.external_po_ref === null &&
+  row.invoice_qty_unit === "Drum" && row.driver_phone_enc && !String(row.driver_phone_enc).includes("9876543210"), JSON.stringify(row));
+await refused("the same supplier invoice twice", entry({ invoiceNo: made?.invoiceNo }), /already in the gate register/);
 
-console.log("the rest arrives");
-const rest = await act(gate, "addGateEntry", [entry({ lines: [line("APF CAP", 2000), line("6 ML EYE LINER box 12pcs", 120), line("APF STICKER", 12.5)] })]);
-check("accepted, one row per item, decimals kept", rest.status === 200 && rest.json.changes.gateEntries.at(-1).lines.length === 3 && rest.json.changes.gateEntries.at(-1).lines[2].qty === 12.5, JSON.stringify(rest.json));
-await refused("the PO is now fully received", entry({ lines: [line("APF CAP", 1)] }), /fully received/);
-
-console.log("direct arrival without PO");
-const direct = await act(gate, "addGateEntry", [entry({ poNo: "", supplierName: "Free Samples Co", productDesc: "POP tray" })]);
-check("accepted with supplier and material typed in", direct.status === 200 && direct.json.changes.gateEntries.at(-1).lines.length === 0, JSON.stringify(direct.json));
+console.log("the photo (one per entry, JPEG, written once)");
+const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(2000, 7), Buffer.from([0xff, 0xd9])]);
+const photo = (who, id, body, type = "image/jpeg") => who("POST", `/api/gate-entries/${id}/photo`, body, type);
+check("Store can't add it", (await photo(store, made.id, jpeg)).status === 403);
+check("not a JPEG → refused", (await photo(gate, made.id, Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(500)]))).status === 400);
+check("an unknown gate entry → refused", (await photo(gate, "GE-99999", jpeg)).status === 409);
+check("more than 1 MB → refused", (await photo(gate, made.id, Buffer.concat([jpeg, Buffer.alloc(1100 * 1024)]))).status === 413);
+const up = await photo(gate, made.id, jpeg);
+check("the gate adds it", up.status === 200, JSON.stringify(up.json));
+check("…the entry now says it has one", (await gate("GET", "/api/state")).json.state.gateEntries.find((g) => g.id === made.id)?.hasPhoto === true);
+const got = await store("GET", `/api/gate-entries/${made.id}/photo`);
+check("Store can look at it (same bytes, image/jpeg)", got.status === 200 && got.type.startsWith("image/jpeg") && got.raw.equals(jpeg), `${got.status} ${got.type} ${got.raw.length}`);
+const again = await photo(gate, made.id, jpeg);
+check("a second photo is refused (it cannot be replaced)", again.status === 409 && /cannot be replaced/.test(again.json?.error), JSON.stringify(again.json));
+check("no photo of an entry without one → 404", (await gate("GET", `/api/gate-entries/GE-99999/photo`)).status === 404);
 
 console.log("vehicle out");
 const out = await act(gate, "recordVehicleOut", [made.id, true, "01:00"]);
 const after = out.json?.changes?.gateEntries?.find((g) => g.id === made.id);
 check("records time out from the server clock and the driver's sign", out.status === 200 && /^\d{2}:\d{2}$/.test(after?.timeOut) && after.timeOut !== "01:00" && after.driverSign, JSON.stringify(out.json));
-const again = await act(gate, "recordVehicleOut", [made.id, true, ""]);
-check("cannot be recorded twice", again.status === 409 && /already left/.test(again.json?.error), JSON.stringify(again.json));
+const twice = await act(gate, "recordVehicleOut", [made.id, true, ""]);
+check("cannot be recorded twice", twice.status === 409 && /already left/.test(twice.json?.error), JSON.stringify(twice.json));
 check("other departments cannot record it", (await act(store, "recordVehicleOut", [made.id, true, ""])).status === 403);
 
 console.log("the database itself");
 const blocked = async (sql, params) => { try { await db.execute(sql, params); return false; } catch { return true; } };
 check("time out cannot be changed once recorded", await blocked("UPDATE gate_entries SET time_out = '00:01' WHERE gate_entry_no = ?", [made.id]));
 check("driver sign cannot be removed", await blocked("UPDATE gate_entries SET driver_signed = 0 WHERE gate_entry_no = ?", [made.id]));
-check("the rest of the entry cannot be changed", await blocked("UPDATE gate_entries SET vehicle_no_enc = NULL WHERE gate_entry_no = ?", [made.id]));
-check("a checked-in item cannot be changed", await blocked("UPDATE gate_entry_lines SET qty = 1 WHERE gate_entry_no = ?", [made.id]));
-check("a checked-in item cannot be deleted", await blocked("DELETE FROM gate_entry_lines WHERE gate_entry_no = ?", [made.id]));
+check("the rest of the entry cannot be changed (driver, vehicle)", await blocked("UPDATE gate_entries SET driver_name = 'X' WHERE gate_entry_no = ?", [made.id]) &&
+  await blocked("UPDATE gate_entries SET vehicle_no_enc = NULL WHERE gate_entry_no = ?", [made.id]));
+check("the photo cannot be changed", await blocked("UPDATE gate_entry_photos SET mime = 'image/png' WHERE gate_entry_no = ?", [made.id]));
+check("the photo cannot be deleted", await blocked("DELETE FROM gate_entry_photos WHERE gate_entry_no = ?", [made.id]));
 await db.end();
 
 console.log(`\n${pass} passed, ${fail} failed`);

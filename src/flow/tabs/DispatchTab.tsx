@@ -3,26 +3,37 @@ import { api, ApiError } from "../api";
 import { CUSTOMER_ROLES } from "../perms";
 import { useAuth } from "../auth";
 import { todayLabel, useFlow } from "../store";
-import { Card, Chip, DateInput, EmptyNote, Field, Table, Td, TextInput, Tr, fmt } from "../ui";
+import { Card, Chip, DateInput, EmptyNote, Field, Pager, Table, Td, TextInput, Tr, fmt, usePaged } from "../ui";
+import { ClipboardList, Truck, Users } from "lucide-react";
+import { CardFlow, type Node } from "./ProductionTab";
 
-export function DispatchTab() {
-  return (
-    <div className="space-y-3">
-      <OrdersCard />
-      <SlipsCard />
-      <CustomersCard />
+// Dispatch as cards; each card is today's screen as it was (to be reworked later)
+const DISPATCH_CARDS: Node[] = [
+  { title: "Customer Orders", tone: "blue", icon: ClipboardList, art: ClipboardList, view: () => <OrdersCard /> },
+  {
+    title: "Dispatch Slips",
+    tone: "green",
+    icon: Truck,
+    art: Truck,
+    view: () => (
+      <div className="space-y-3">
+        <SlipsCard />
+        <p className="text-[11px] leading-relaxed text-muted">
+          The slip matches your handwritten Dispatch Packing Slip. A work order stays open until
+          fully dispatched; a batch must pass PDI before it can go out; Accounts adds the invoice;
+          security verifies invoice + packing slip before the vehicle leaves. Gate out needs both.
+        </p>
+      </div>
+    ),
+  },
+  { title: "Customers", tone: "purple", icon: Users, art: Users, view: () => <CustomersCard /> },
+];
 
-      <p className="text-[11px] leading-relaxed text-muted">
-        The slip matches your handwritten Dispatch Packing Slip. A work order stays open until
-        fully dispatched; a batch must pass PDI before it can go out; Accounts adds the invoice;
-        security verifies invoice + packing slip before the vehicle leaves. Gate out needs both.
-      </p>
-    </div>
-  );
-}
+export const DispatchTab = () => <CardFlow root="Dispatch" top={DISPATCH_CARDS} />;
 
 function OrdersCard() {
     const { state, fgStock, orderProgress, addOrder, masters } = useFlow();
+    const paged = usePaged(orderProgress.slice().reverse(), 20);
     const PRODUCTS = masters.products;
     const { can } = useAuth();
     const [open, setOpen] = useState(false);
@@ -141,10 +152,7 @@ function OrdersCard() {
             "Status",
           ]}
         >
-          {orderProgress
-            .slice()
-            .reverse()
-            .flatMap((op, oi) =>
+          {paged.rows.flatMap((op, oi) =>
               op.lines.map((l, li) => (
                 <Tr key={`${op.order.id}-${li}`} zebra={oi % 2 === 1}>
                   <Td num strong>{op.order.id}</Td>
@@ -169,6 +177,7 @@ function OrdersCard() {
               )),
             )}
         </Table>
+        <Pager {...paged} />
         {state.orders.length === 0 && <EmptyNote>No customer orders yet.</EmptyNote>}
       </Card>
     );

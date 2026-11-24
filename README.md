@@ -8,20 +8,74 @@ React + Vite frontend, Node.js + Express backend (TypeScript), MySQL 8 relationa
 (see `docs/DATABASE_DESIGN.md`; every endpoint with real requests and responses in `docs/API.md`). Department logins, role-based
 access enforced on the server, sensitive fields encrypted at rest, every action audited.
 
-## Run it locally (Laragon MySQL)
+## How to run — exact steps (Windows + Laragon)
 
+What to install first: see `requirement.txt`.
+
+**One time — install**
+1. Install **Laragon**, open it, click **Start All** (MySQL must show as running).
+2. Install **Node.js 20+** (LTS). Check in a new terminal: `node -v`.
+3. Open a terminal **in this project folder** (the one with `package.json`).
+4. Install the packages:
+   ```bash
+   npm install
+   ```
+5. Create the settings file `.env` (fresh secrets; never commit or share it):
+   ```bash
+   npm run env:init
+   ```
+   Laragon's MySQL `root` has no password, so the defaults work as they are.
+6. Create the database, its tables and the logins:
+   ```bash
+   npm run db:setup -- --dev-passwords
+   ```
+   Logins are `gate`, `store`, `qc`, `packing`, `fgwh`, `accounts`, `purchase`, `security`, `admin`,
+   each with password `seven@<login>` (e.g. `admin` / `seven@admin`).
+
+**Every day — start it (development)**
+1. Laragon → **Start All**.
+2. In the project folder:
+   ```bash
+   npm run dev
+   ```
+3. Open **http://localhost:5173** and log in.
+4. Stop with **Ctrl + C**.
+
+**Run the built version (one process, port 4000)**
+
+First set `APP_ORIGIN=http://localhost:4000` in `.env` (it must be the exact address you open —
+`http://localhost:5173` for `npm run dev`, your https address behind a tunnel or proxy).
 ```bash
-npm install
-npm run env:init                    # writes .env with fresh secrets (never commit it)
-npm run db:setup -- --dev-passwords # database, app account, schema, suppliers, 9 logins (seven@<dept>)
-npm run db:demo                     # optional: load the demo storyline
-npm run dev                         # API on :4000 + web on http://localhost:5173
+npm run build
+npm start
 ```
+Open **http://localhost:4000**. After any code change: `npm run build`, then stop and `npm start` again.
+
+**After pulling new code:** `npm install`, back up the database (below), `npm run db:setup` (adds new
+tables), `npm run build`, restart.
+
+**Backup the database** (before every update):
+```bash
+C:\laragon\bin\mysql\mysql-8.4.3-winx64\bin\mysqldump -uroot --single-transaction --routines --triggers seven_seas_flow > backup.sql
+```
+
+**Tests** (use their own `seven_seas_flow_test` database, never the working one; takes a few minutes):
+```bash
+npm test
+```
+
+**Common problems**
+| Message | Fix |
+|---|---|
+| `ECONNREFUSED 127.0.0.1:3306` | MySQL not running — Laragon → Start All |
+| `.env already exists` | fine — keep it (a new one makes encrypted data unreadable) |
+| Port 4000 / 5173 in use | an old server is still running — close that terminal |
+| Tally sync error on the Purchase screen | TallyPrime closed or its server off; the app keeps working |
 
 `db:setup` connects as `DB_ADMIN_USER` (Laragon: `root`, empty password) only to create the
 database and a restricted `flow_app` account; the server itself always runs as `flow_app`.
 Without `--dev-passwords`, random temporary passwords are printed once and each department must
-choose its own at first login.
+choose its own at first login. Moving to another PC: `docs/SETUP-NEW-SYSTEM.md`.
 
 ## Production
 
@@ -39,9 +93,12 @@ the database and its backups cannot be read. Remove `DB_ADMIN_*` from `.env` aft
 
 User management is command-line only (deliberately not exposed over the web):
 
+Admin can also add logins in the app: **Users** tab (live username check; admin types a starting password, the person must change it at first login).
+
 ```bash
 npm run user -- list
-npm run user -- create ramesh store "Store — Ramesh"
+npm run user -- create ramesh_01 gate "Gate Entry" "Ramesh Kumar"   # login id, role, label (the job), name (the person)
+npm run user -- name ramesh_01 "Ramesh Kumar"   # set or change the person's name
 npm run user -- reset ramesh      # new temporary password, signs out everywhere
 npm run user -- disable ramesh    # blocks login, signs out everywhere
 npm run user -- unlock ramesh     # after 5 wrong passwords
@@ -119,12 +176,8 @@ go-live by the owner — *Close old POs* closes every PO dated before a date tha
 | Stage locks | once a stage is passed its facts are frozen — in the business rules **and** by MySQL triggers (so not even a bug, a direct SQL edit or a compromised app account can alter them): gate entries, QC slips/results, MRNs, PDI, orders, lines are write-once; approval, PO link, issue, receipt, invoice and gate-out are set once; a GRN's quantity locks when it goes to QC; a barcode can only be recorded once, on approved material; register entries can never be deleted; the audit log and snapshots are append-only even for the database admin |
 | Encryption at rest | AES-256-GCM (authenticated) for customer party name/address/PO, dispatch invoice no, PO lines (rates), supplier rates, vehicle/LR numbers, and audit payloads |
 | Database | runtime account has table-level privileges only; `audit_log` is INSERT-only for it (append-only trail); parameterised queries, multi-statements off |
-| Destructive resets | "Clear all" / "Load demo data" exist only where `ALLOW_DEMO_RESET=true`, only for the admin, and need the admin's password **and** a typed phrase (`CLEAR ALL` / `LOAD DEMO`), both checked on the server; wrong passwords count toward the lockout; 5 failed attempts per 15 min; an encrypted snapshot of all registers is saved in the same transaction first (the app account can add snapshots but never delete them) |
 | Audit | every login, logout, password change and action — allowed, refused, denied or invalid — with user, role, IP and time |
 | HTTP | Helmet: strict CSP (`script-src 'self'`), HSTS, frame-ancestors none, no-sniff, referrer policy; API responses `no-store`; errors never leak internals |
-
-Undo a reset (server command line): `npm run snapshot -- list`, then `npm run snapshot -- restore <id>`
-(the data being replaced is itself snapshotted first, so a restore can be undone too).
 
 **Tests: `npm test`** runs every suite below on its own database (`<DB_NAME>_test`, recreated each
 run) and its own API on port 4001 — the working database is never touched. `node server/test/flow.mjs`
@@ -177,8 +230,7 @@ component codes PMS0848/PMS0849, supplier names, the requisition slip of 10-Aug-
 
 **Demo:** all stock figures, dates, batch numbers (`LL112-B01` style), signatures, parties and
 the remaining register entries — seeded in `server/seed/demoStory.ts` so the demo starts mid-story with
-material under test, on hold, rejected, in FG stock and awaiting gate-out. **Load demo data**
-(admin header button, only where `ALLOW_DEMO_RESET=true`, or `npm run db:demo`) restores this state.
+material under test, on hold, rejected, in FG stock and awaiting gate-out.
 
 ## Code layout
 

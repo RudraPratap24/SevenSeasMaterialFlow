@@ -166,7 +166,7 @@ out = await tally(["watch", "--once"], { TALLY_URL: "http://127.0.0.1:4019" }); 
 const failing = (await purchase("GET", "/api/tally-status")).json.status;
 check("Tally closed: the run does not stop, the failure is recorded for Purchase (since, why)",
   !/^FAILED/.test(out) && /does not answer/.test(failing?.syncError?.error ?? "") && failing.syncedAt !== "", JSON.stringify(failing));
-check("…the gate only sees when the list was last updated", JSON.stringify(Object.keys((await gate("GET", "/api/tally-status")).json.status ?? {})) === '["syncedAt"]');
+check("…the gate does not get it (it has no POs now)", (await gate("GET", "/api/tally-status")).status === 403);
 check("…and the app keeps working (POs still there)", (await purchase("GET", "/api/state")).json.state.tallyPos.some((p) => p.poNo === PO1));
 out = await tally(["watch", "--once"]);
 check("Tally back: the next run works and clears the failure", (await purchase("GET", "/api/tally-status")).json.status?.syncError === null, out);
@@ -174,7 +174,7 @@ check("Tally back: the next run works and clears the failure", (await purchase("
 console.log("a PO raised here is created in Tally");
 const raise = async (vendor) => {
   const ind = (await act(purchase, "addIndent", [{ date: "", componentCode: CODE, componentName: "", qty: 10, reason: "test", supplierName: vendor, rate: 2 }])).json?.changes?.indents?.at(-1);
-  const r = await act(purchase, "raisePo", [{ date: "", supplierName: vendor, lines: [{ componentCode: CODE, componentName: "", qty: 10, rate: 2 }], expectedDate: "", indentIds: [ind.id] }]);
+  const r = await act(purchase, "raisePo", [{ date: "", supplierName: vendor, lines: [{ componentCode: CODE, componentName: "", qty: 10, rate: 2 }], expectedDate: "", indentIds: [ind.id], gst: "INTER" }]);
   return r.json?.changes?.purchaseOrders?.at(-1)?.id;
 };
 const waitForSend = async (po) => {
@@ -200,8 +200,11 @@ const sent = await waitForSend(APP_PO);
 check("approval sends it to Tally on its own", sent && sent.tallyError === "", JSON.stringify(sent));
 check("…with Tally's own names, number and amounts",
   lastImport.includes(`<VOUCHERNUMBER>${APP_PO}</VOUCHERNUMBER>`) && lastImport.includes(`<STOCKITEMNAME>${items[0].name}</STOCKITEMNAME>`) &&
-  lastImport.includes(`<PARTYLEDGERNAME>${vendors[0].name}</PARTYLEDGERNAME>`) && lastImport.includes("<AMOUNT>-20.00</AMOUNT>") && lastImport.includes("<AMOUNT>20.00</AMOUNT>"),
+  lastImport.includes(`<PARTYLEDGERNAME>${vendors[0].name}</PARTYLEDGERNAME>`) && lastImport.includes("<AMOUNT>-20.00</AMOUNT>") && lastImport.includes("<AMOUNT>23.60</AMOUNT>"),
   lastImport.slice(0, 600));
+check("…with GST as Tally's own POs: IGST ledger 18% (3.60), party total with GST (23.60), no CGST/SGST",
+  /<LEDGERNAME>IGST<\/LEDGERNAME>\s*<ISDEEMEDPOSITIVE>Yes<\/ISDEEMEDPOSITIVE>\s*<AMOUNT>-3\.60<\/AMOUNT>/.test(lastImport) && !lastImport.includes("<LEDGERNAME>CGST</LEDGERNAME>"),
+  lastImport.slice(-900));
 check("read back: the app shows it IN TALLY", (await inTally(APP_PO)) === "IN_TALLY");
 lastImport = "";
 out = await tally(["push", APP_PO], { TALLY_ALLOW_WRITE: "true" });
@@ -229,7 +232,7 @@ check("one number everywhere: the PO is now the new number, in Tally, and its in
   !clashState.purchaseOrders.some((p) => p.id === CLASH) && clashIndent && moved.indentIds.includes(clashIndent),
   JSON.stringify({ moved, clashIndent }));
 await sync(); // Tally's own hand-made POs come in with the next sync
-const atGate = L.gatePos((await gate("GET", "/api/state")).json.state);
+const atGate = L.gatePos((await purchase("GET", "/api/state")).json.state);
 check("the gate sees ours once under its number, and the old number only as Tally's own PO",
   atGate.filter((p) => p.poNo === NEW_NO).length === 1 && atGate.filter((p) => p.poNo === CLASH).length === 1 && atGate.find((p) => p.poNo === CLASH).lines[0]?.unit === "Kg",
   JSON.stringify(atGate.filter((p) => [CLASH, NEW_NO].includes(p.poNo))));
@@ -256,22 +259,28 @@ check("Purchase retries: created", retry.status === 200 && (await inTally(REFUSE
 check("…and the reason is cleared", (await waitForSend(REFUSED))?.tallyError === "");
 await db.end();
 fake.close();
+const store = await login("store");
 const isOpen = async (no) => {
-  const s = (await gate("GET", "/api/state")).json.state;
+  const s = (await store("GET", "/api/state")).json.state;
   return L.deriveTallyPoProgress(L.gatePos(s), s.gateEntries, s.grnLines).find((p) => p.po.poNo === no)?.open;
 };
-const gateIn = (no) => act(gate, "addGateEntry", [{
-  date: "", supplierName: "", productDesc: "", invoiceNo: `C-${tag}-${Math.random().toString(36).slice(2, 6)}`, invoiceDate: "",
-  poNo: no, invoiceQty: null, transportName: "", lrNo: "", vehicleNo: "HR55-C-0001", timeIn: "00:00", timeOut: "", driverSign: false,
-  remark: "", lines: [{ itemName: items[0].name.replace("RENAMED ", ""), itemCode: "", unit: "", qty: 1, remark: "" }],
+const vehicle = (await act(gate, "addGateEntry", [{
+  supplierName: vendors[0].name, invoiceNo: `C-${tag}`, invoiceDate: "", invoiceQty: 1, invoiceQtyUnit: "Box",
+  transportName: "", lrNo: "", vehicleNo: "HR55-C-0001", driverName: "", driverPhone: "",
+}])).json?.changes?.gateEntries?.at(-1);
+// Store receives 1 against the PO (the gate records no PO now)
+const gateIn = (no) => act(store, "addGrnLine", [{
+  gateEntryId: vehicle?.id, gateLineNo: null, componentCode: CODE, componentName: "", type: "", brandName: "", receivedDate: "",
+  poNo: no, poItemName: items[0].name.replace("RENAMED ", ""), poQty: null, invoiceNo: "", supplierName: "", qtyPerBox: null,
+  totalBoxes: null, totalQty: 1, unit: "", remarkStore: "", location: "",
 }]);
 
 console.log("PO closed in MySQL");
 check("open before", (await isOpen(PO1)) === true);
 check("Purchase closes it with a reason", (await act(purchase, "closePo", [PO1, "Vendor will not supply the balance", "", ""])).status === 200);
-check("closed: not open at the gate", (await isOpen(PO1)) === false);
+check("closed: not open for GRN", (await isOpen(PO1)) === false);
 const refused = await gateIn(PO1);
-check("the gate cannot receive against it", refused.status === 409 && /closed/.test(refused.json?.error), JSON.stringify(refused.json));
+check("Store cannot receive against it", refused.status === 409 && /closed/.test(refused.json?.error), JSON.stringify(refused.json));
 check("closing twice is refused", (await act(purchase, "closePo", [PO1, "again", "", ""])).status === 409);
 check("Purchase reopens it", (await act(purchase, "reopenPo", [PO1, "", ""])).status === 200 && (await isOpen(PO1)) === true);
 check("the gate can't close POs", (await act(gate, "closePo", [PO1, "x", "", ""])).status === 403);
@@ -285,8 +294,8 @@ check("closes old POs without receipts", cut.status === 200 && cut.json.changes.
 check("…but not a PO with a receipt in the app", (await isOpen(PO1)) === true);
 const st = (await purchase("GET", "/api/tally-status")).json.status;
 check("Purchase sees the sync status", typeof st?.syncedAt === "string" && Array.isArray(st.skipped), JSON.stringify(st).slice(0, 200));
-const gs = (await gate("GET", "/api/tally-status")).json.status;
-check("the gate sees only the sync time", gs && Object.keys(gs).join() === "syncedAt", JSON.stringify(gs));
+const ss = (await store("GET", "/api/tally-status")).json.status;
+check("Store sees only the sync time (no skipped POs, no failures)", ss && Object.keys(ss).join() === "syncedAt", JSON.stringify(ss));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

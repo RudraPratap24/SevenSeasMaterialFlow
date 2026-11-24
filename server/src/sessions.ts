@@ -10,6 +10,8 @@ export interface SessionUser {
   username: string;
   role: Role;
   label: string;
+  /** The person's own name ("" until set with npm run user -- name). */
+  name: string;
   mustChangePassword: boolean;
   sessionId: string;
 }
@@ -29,7 +31,7 @@ export const COOKIE_NAME = isProd ? "__Host-flow_sid" : "flow_sid";
 function cookieOptions(): CookieOptions {
   return {
     httpOnly: true, // unreadable from JavaScript — an XSS cannot steal the session
-    secure: isProd,
+    secure: isProd || config.APP_ORIGIN.startsWith("https://"),
     sameSite: "strict", // never sent on cross-site requests — first line of CSRF defence
     path: "/",
     maxAge: config.SESSION_ABSOLUTE_HOURS * 3600 * 1000,
@@ -80,7 +82,7 @@ export async function loadSession(req: Request, _res: Response, next: NextFuncti
   const id = hashToken(token);
   const [rows] = await pool.execute<RowDataPacket[]>(
     `SELECT s.id AS sid, TIMESTAMPDIFF(SECOND, s.last_seen_at, NOW(3)) AS idle,
-            u.id, u.username, u.role, u.label, u.must_change_password
+            u.id, u.username, u.role, u.label, u.full_name, u.must_change_password
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id = ? AND s.expires_at > NOW(3) AND u.active = 1`,
     [id],
@@ -99,6 +101,7 @@ export async function loadSession(req: Request, _res: Response, next: NextFuncti
     username: r.username,
     role: r.role as Role,
     label: r.label,
+    name: r.full_name,
     mustChangePassword: Number(r.must_change_password) === 1,
     sessionId: r.sid,
   };
@@ -128,6 +131,7 @@ export function publicUser(u: SessionUser) {
     username: u.username,
     role: u.role,
     label: u.label,
+    name: u.name,
     tabs: profile.tabs,
     viewOnly: profile.viewOnly,
     mustChangePassword: u.mustChangePassword,

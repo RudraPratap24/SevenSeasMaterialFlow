@@ -18,6 +18,8 @@ export interface Account {
   username: string;
   role: Role;
   label: string;
+  /** The person's own name ("" if not set). */
+  name: string;
   tabs: TabId[];
   viewOnly: TabId[];
   mustChangePassword: boolean;

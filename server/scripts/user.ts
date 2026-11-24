@@ -1,7 +1,8 @@
 /**
  * User management from the server's command line (deliberately not exposed over the web).
  *   npm run user -- list
- *   npm run user -- create <login-id> <role> ["Label shown in the app"]
+ *   npm run user -- create <login-id> <role> ["Label shown in the app"] ["Person's name"]
+ *   npm run user -- name <login-id> "Person's name"   sets the person's own name (label = the job)
  *   npm run user -- reset <login-id>        new temporary password, signs out everywhere
  *   npm run user -- disable <login-id>      blocks login, signs out everywhere
  *   npm run user -- enable <login-id>
@@ -12,7 +13,7 @@ import { ROLES, ROLE_PROFILES, type Role } from "../../src/flow/perms";
 import { generatePassword, hashPassword } from "../src/crypto";
 import { pool } from "../src/db";
 
-const [cmd, username, roleArg, labelArg] = process.argv.slice(2);
+const [cmd, username, roleArg, labelArg, nameArg] = process.argv.slice(2);
 
 function need(v: string | undefined, what: string): string {
   if (!v) throw new Error(`Missing ${what}. See the usage at the top of server/scripts/user.ts.`);
@@ -35,13 +36,14 @@ async function main() {
   switch (cmd) {
     case "list": {
       const [rows] = await pool.query<RowDataPacket[]>(
-        "SELECT username, role, label, active, must_change_password, locked_until, last_login_at FROM users ORDER BY id",
+        "SELECT username, role, label, full_name, active, must_change_password, locked_until, last_login_at FROM users ORDER BY id",
       );
       console.table(
         rows.map((r) => ({
           login: r.username,
           role: r.role,
           label: r.label,
+          name: r.full_name,
           active: Number(r.active) === 1,
           mustChange: Number(r.must_change_password) === 1,
           lockedUntil: r.locked_until ?? "",
@@ -57,11 +59,19 @@ async function main() {
       if (!ROLES.includes(role)) throw new Error(`Role must be one of: ${ROLES.join(", ")}`);
       const password = generatePassword();
       await pool.execute(
-        "INSERT INTO users (username, password_hash, role, label, must_change_password) VALUES (?, ?, ?, ?, 1)",
-        [id, await hashPassword(password), role, (labelArg ?? ROLE_PROFILES[role].label).slice(0, 80)],
+        "INSERT INTO users (username, password_hash, role, label, full_name, must_change_password) VALUES (?, ?, ?, ?, ?, 1)",
+        [id, await hashPassword(password), role, (labelArg ?? ROLE_PROFILES[role].label).slice(0, 80), (nameArg ?? "").trim().slice(0, 80)],
       );
       await cliAudit("user.create", id);
       console.log(`Created ${id} (${role}). Temporary password: ${password}`);
+      break;
+    }
+    case "name": {
+      const id = need(username, "login id");
+      const name = need(roleArg?.trim(), "name");
+      await changed("UPDATE users SET full_name = ? WHERE username = ?", [name.slice(0, 80), id]);
+      await cliAudit("user.name", id);
+      console.log(`${id} is now named ${name}.`);
       break;
     }
     case "reset": {
@@ -95,7 +105,7 @@ async function main() {
       break;
     }
     default:
-      throw new Error("Usage: npm run user -- list | create <id> <role> [label] | reset <id> | disable <id> | enable <id> | unlock <id>");
+      throw new Error("Usage: npm run user -- list | create <id> <role> [label] [name] | name <id> <name> | reset <id> | disable <id> | enable <id> | unlock <id>");
   }
 }
 

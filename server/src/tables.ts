@@ -16,4 +16,7 @@ export const HEADER: Record<DocCollection, { table: string; key: string }> = {
   purchaseOrders: { table: "purchase_orders", key: "po_no" },
   tallyPos: { table: "tally_purchase_orders", key: "po_no" },
   poClosures: { table: "po_closures", key: "po_no" },
+  debitNotes: { table: "debit_notes", key: "dn_no" },
+  escalationClosures: { table: "escalation_closures", key: "grn_no" },
+  bomIssues: { table: "bom_issue_slips", key: "bom_no" },
 };

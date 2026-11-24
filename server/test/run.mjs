@@ -25,7 +25,7 @@ Object.assign(process.env, {
   TALLY_COMPANY: "",
 });
 const BASE = "http://127.0.0.1:4001";
-const SUITES = ["gate", "grn", "flow", "purchase", "tallysync", "security", "parallel", "integrity", "reset", "concurrency"]; // concurrency changes a password: last
+const SUITES = ["gate", "grn", "flow", "purchase", "tallysync", "security", "parallel", "integrity", "reset", "production", "concurrency"]; // concurrency changes a password: last
 const node = (args, opts = {}) => execFileSync(process.execPath, args, { stdio: "pipe", encoding: "utf8", ...opts });
 
 const admin = await mysql.createConnection({
@@ -48,6 +48,8 @@ for (let i = 0; ; i++) {
 
 let failed = 0;
 for (const suite of SUITES) {
+  // the API allows 600 requests a minute per address; let the window clear before the suites that need a quiet one
+  if (suite === "concurrency" || suite === "production") await new Promise((r) => setTimeout(r, 61_000));
   let out;
   try {
     out = node([`server/test/${suite}.mjs`, BASE]);

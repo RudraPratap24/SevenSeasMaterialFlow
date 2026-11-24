@@ -1,17 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AuthProvider, ChangePasswordScreen, LoginScreen, useAuth, Wordmark } from "./auth";
 import { FlowProvider, useFlow, type ResetResult, type TabId } from "./store";
+import { api } from "./api";
 import { fmt, Icon } from "./ui";
-import { awaitingGrn, deriveTallyPoProgress, gatePos } from "./logic";
+import { awaitingGrn, debitNotesDue, openEscalations } from "./logic";
 import { FlowTab } from "./tabs/FlowTab";
 import { GateTab } from "./tabs/GateTab";
 import { GrnTab } from "./tabs/GrnTab";
 import { QcTab } from "./tabs/QcTab";
 import { PmStockTab } from "./tabs/PmStockTab";
-import { RequisitionTab } from "./tabs/RequisitionTab";
 import { FgTab } from "./tabs/FgTab";
 import { DispatchTab } from "./tabs/DispatchTab";
 import { PurchaseTab } from "./tabs/PurchaseTab";
+import { EscalationTab } from "./tabs/EscalationTab";
+import { ProductionTab, StoreTab } from "./tabs/ProductionTab";
+import { PoApprovalTab } from "./tabs/PoApprovalTab";
+import { UsersTab } from "./tabs/UsersTab";
+
+// Production planning lives in a separate Google Apps Script app; the tab just opens it.
+const PRODUCTION_URL =
+  "https://script.google.com/a/macros/sevenseascosmetics.com/s/AKfycbxp6PG01sUdABQgA9f3gAG-hMZA_Z3DMA4Qo9ofyWzysou5NmNaWLCsUkhiN2tCQ0fD/exec";
 
 const TAB_LABELS: Record<TabId, string> = {
   flow: "Flow",
@@ -19,10 +27,14 @@ const TAB_LABELS: Record<TabId, string> = {
   grn: "GRN",
   qc: "QC",
   pmstock: "PM Stock",
-  requisition: "Requisition",
   fg: "FG Warehouse",
   dispatch: "Dispatch",
   purchase: "Purchase",
+  escalation: "Escalations",
+  production: "Production Flow",
+  store: "Store",
+  approval: "PO Approval",
+  users: "Users",
 };
 
 const HEAD_BTN =
@@ -53,6 +65,10 @@ function Shell() {
   const { clearAll, loadDemo, traceBatch, traceGrn, epoch, loaded, busy, error, dismissError } = useFlow();
   const { user, logout, can, canSee, isViewOnly, demoReset } = useAuth();
   const [tab, setTab] = useState<TabId>(user?.tabs[0] ?? "flow");
+  // Tabs stay mounted (hidden) once opened, so half-filled forms and open cards survive a look at another tab.
+  const opened = useRef(new Set<TabId>());
+  opened.current.add(tab);
+  const keep = (t: TabId, node: ReactNode) => opened.current.has(t) && <div hidden={tab !== t}>{node}</div>;
   const [changingPassword, setChangingPassword] = useState(false);
   const [resetOp, setResetOp] = useState<"load" | "clear" | null>(null);
   const [tracePick, setTracePick] = useState<{ kind: "batch" | "grn"; key: string } | null>(null);
@@ -135,6 +151,14 @@ function Shell() {
             {isViewOnly(t) && <span className="ml-1 text-[9px] font-semibold normal-case tracking-normal">(view)</span>}
           </button>
         ))}
+        <a
+          href={PRODUCTION_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="relative whitespace-nowrap px-[18px] py-3.5 text-[12px] font-bold uppercase tracking-[.07em] text-muted hover:text-ink"
+        >
+          Production ↗
+        </a>
       </nav>
 
       <PendingStrip goTo={goTo} />
@@ -174,7 +198,8 @@ function Shell() {
             View only — {user?.label} can see this register but cannot change it.
           </p>
         )}
-        {tab === "flow" && (
+        {keep(
+          "flow",
           <FlowTab
             goTo={goTo}
             trace={trace}
@@ -187,16 +212,20 @@ function Shell() {
               const [kind, key] = value.split("::") as ["batch" | "grn", string];
               setTracePick({ kind, key });
             }}
-          />
+          />,
         )}
-        {tab === "gate" && <GateTab />}
-        {tab === "grn" && <GrnTab onTrace={(g) => traceFromRegister("grn", g)} />}
-        {tab === "qc" && <QcTab />}
-        {tab === "pmstock" && <PmStockTab />}
-        {tab === "requisition" && <RequisitionTab />}
-        {tab === "fg" && <FgTab onTraceBatch={(b) => traceFromRegister("batch", b)} />}
-        {tab === "dispatch" && <DispatchTab />}
-        {tab === "purchase" && <PurchaseTab />}
+        {keep("gate", <GateTab />)}
+        {keep("grn", <GrnTab onTrace={(g) => traceFromRegister("grn", g)} />)}
+        {keep("qc", <QcTab />)}
+        {keep("pmstock", <PmStockTab />)}
+        {keep("fg", <FgTab onTraceBatch={(b) => traceFromRegister("batch", b)} />)}
+        {keep("dispatch", <DispatchTab />)}
+        {keep("purchase", <PurchaseTab />)}
+        {keep("escalation", <EscalationTab />)}
+        {keep("production", <ProductionTab />)}
+        {keep("store", <StoreTab />)}
+        {keep("approval", <PoApprovalTab />)}
+        {keep("users", <UsersTab />)}
 
         <p className="mt-3 text-[11px] leading-relaxed text-muted">
           Register formats are your own documents. Component and product lists are from your BOM.
@@ -351,10 +380,24 @@ function ResetDialog({
  * The client's "barriers" made visible: each login lands on its pending work.
  * QC sees what waits for testing; store sees what waits for GRN or issue; and so on.
  */
+interface PendingCounts {
+  mrnToVerify: number;
+  bomsToVerify: number;
+  requestsToIndent: number;
+  bulkToTest: number;
+  notesToReceive: number;
+}
+
+/** Each department sees only its own open work; a click opens the tab where it is done. */
 function PendingStrip({ goTo }: { goTo: (t: TabId) => void }) {
-  const { state, fgStock, shortList, poProgress, orderProgress } = useFlow();
-  const { user, canSee } = useAuth();
+  const { state, fgStock, poProgress, orderProgress, openBoms, productionTick } = useFlow();
+  const { user, canSee, can } = useAuth();
+  const [counts, setCounts] = useState<PendingCounts | null>(null);
+  useEffect(() => {
+    if (user) api<PendingCounts>("GET", "/pending-counts").then(setCounts, () => setCounts(null));
+  }, [user, productionTick]);
   if (!user) return null;
+  const c = counts ?? { mrnToVerify: 0, bomsToVerify: 0, requestsToIndent: 0, bulkToTest: 0, notesToReceive: 0 };
 
   const decided = new Map(state.arRecords.map((a) => [a.intimationId, a.status]));
 
@@ -372,7 +415,6 @@ function PendingStrip({ goTo }: { goTo: (t: TabId) => void }) {
     return !st || st === "HOLD";
   }).length;
   const pdiPending = fgStock.filter((r) => r.inStock > 0 && r.pdi !== "PASSED").length;
-  const reqPending = state.requisitions.filter((r) => r.status === "PENDING").length;
   const fgInTransit = state.fgTransfers.filter((t) => t.status === "IN_TRANSIT").length;
   const awaitingInvoice = state.dispatchSlips.filter((d) => !d.invoiceNo).length;
   const awaitingGateOut = state.dispatchSlips.filter((d) => d.invoiceNo && !d.gateOut).length;
@@ -381,22 +423,23 @@ function PendingStrip({ goTo }: { goTo: (t: TabId) => void }) {
 
   switch (user.role) {
     case "gate":
-      add("open POs", deriveTallyPoProgress(gatePos(state), state.gateEntries, state.grnLines).filter((p) => p.open).length, "gate");
       add("vehicles inside (no time out)", state.gateEntries.filter((g) => !g.timeOut).length, "gate");
       break;
     case "store":
       add("items waiting for GRN", waitingGrn, "grn");
       add("GRNs to send to QC", grnNotSent, "grn");
-      add("requisitions to issue", reqPending, "requisition");
+      add("BOM lists to issue", openBoms.length, "store");
+      add("MRNs to verify", c.mrnToVerify, "store");
       break;
     case "qc":
       add("materials waiting for QC", qcPending, "qc");
       add("batches waiting for PDI", pdiPending, "qc");
       break;
     case "packing":
-      add("requisitions pending issue", reqPending, "requisition");
+      add("issued BOM lists to verify", c.bomsToVerify, "production");
       break;
     case "fgwh":
+      add("FG transfer notes to verify", c.notesToReceive, "fg");
       add("transfers to receive", fgInTransit, "fg");
       add("open customer orders", openOrders, "dispatch");
       break;
@@ -407,18 +450,26 @@ function PendingStrip({ goTo }: { goTo: (t: TabId) => void }) {
       add("vehicles awaiting gate-out", awaitingGateOut, "dispatch");
       break;
     case "purchase":
-      add("items below minimum level", shortList.length, "purchase");
+      add("indent requests to indent", c.requestsToIndent, "purchase");
       add("POs awaiting owner approval", posToApprove, "purchase");
+      add("debit notes to raise", debitNotesDue(state).length, "purchase");
+      add("open escalations", openEscalations(state).length, "escalation");
       break;
     case "admin":
       add("waiting for QC", qcPending, "qc");
       add("PDI pending", pdiPending, "qc");
-      add("requisitions to issue", reqPending, "requisition");
+      add("BOM lists to issue", openBoms.length, "store");
+      add("MRNs to verify", c.mrnToVerify, "store");
+      add("BOM lists to verify", c.bomsToVerify, "production");
+      if (can("qc.decide")) add("bulk batches to test", c.bulkToTest, "production");
+      add("FG transfer notes to verify", c.notesToReceive, "fg");
       add("transfers to receive", fgInTransit, "fg");
+      add("indent requests to indent", c.requestsToIndent, "purchase");
       add("awaiting invoice", awaitingInvoice, "dispatch");
       add("awaiting gate-out", awaitingGateOut, "dispatch");
-      add("below min level", shortList.length, "purchase");
-      add("POs to approve", posToApprove, "purchase");
+      add("POs to approve", posToApprove, "approval");
+      add("debit notes to raise", debitNotesDue(state).length, "purchase");
+      add("open escalations", openEscalations(state).length, "escalation");
       break;
   }
 

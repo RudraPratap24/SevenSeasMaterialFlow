@@ -22,7 +22,7 @@ interface Rule {
   extra?: string;
   /** Columns handled by `extra` instead of the generic lock. */
   special?: string[];
-  /** Key columns that may change only while the session says so (@flow_renumber = 1, set by renumberPo). */
+  /** Key columns that may change only while the session says so (@flow_renumber = 1: renumberPo, item re-coding). */
   renumber?: string[];
 }
 
@@ -35,14 +35,18 @@ const RULES: Record<string, Rule> = {
               SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Driver sign is already recorded and cannot be removed';
             END IF;`,
   },
-  gate_entry_lines: {},
+  // item codes change only when the item master is re-coded (npm run master:import)
+  gate_entry_lines: { renumber: ["item_code"] },
+  gate_entry_photos: {},
   goods_receipts: {
     until: {
-      cols: ["total_qty", "location_id", "remark_store"],
+      // the count's judgement against the PO (±20%) follows the count while it can still change
+      cols: ["total_qty", "location_id", "remark_store", "variance", "closes_item"],
       cond: "NOT EXISTS (SELECT 1 FROM qc_intimations q WHERE q.grn_no = OLD.grn_no)",
       why: "GRN quantity is locked once sent to QC",
     },
     special: ["barcoded"],
+    renumber: ["component_code", "po_item_code"],
     // The sticker can only be recorded as pasted (0 → 1), and only on QC-approved material.
     extra: `IF NOT (OLD.barcoded <=> NEW.barcoded) AND (OLD.barcoded = 1 OR
               (SELECT qc_status FROM v_grn_qc_status WHERE grn_no = OLD.grn_no) <> 'APPROVED') THEN
@@ -51,13 +55,17 @@ const RULES: Record<string, Rule> = {
   },
   qc_intimations: {},
   qc_results: {},
+  debit_notes: {},
+  escalation_closures: {},
+  bom_issue_slips: {},
+  bom_issue_lines: { renumber: ["component_code"] },
   requisitions: {
     setOnce: ["issued_at", "issued_by"],
     until: { cols: ["store_sign"], cond: "OLD.issued_at IS NULL", why: "Requisition is issued and locked" },
   },
-  requisition_lines: { setOnce: ["qty_issued"] },
+  requisition_lines: { setOnce: ["qty_issued"], renumber: ["component_code"] },
   material_returns: {},
-  material_return_lines: {},
+  material_return_lines: { renumber: ["component_code"] },
   fg_transfers: {
     setOnce: ["received_on", "received_by"],
     until: { cols: ["checked_by", "location_id"], cond: "OLD.received_on IS NULL", why: "FG transfer is received and locked" },
@@ -74,12 +82,20 @@ const RULES: Record<string, Rule> = {
   // The Tally send result is bookkeeping: retried until Tally takes the PO.
   // A PO whose number Tally already used gets a new one (its lines and indents follow by ON UPDATE CASCADE).
   purchase_orders: {
-    setOnce: ["approved_by", "approved_at"],
+    setOnce: ["approved_by", "approved_at", "rejected_by", "rejected_at", "reject_reason", "gst_type"],
     special: ["tally_push_at", "tally_push_error"],
     renumber: ["po_no"],
   },
-  purchase_order_lines: {},
-  purchase_indents: { setOnce: ["po_no"] },
+  purchase_order_lines: { renumber: ["component_code"] },
+  // an indent's PO is set once — unless that PO was rejected, which frees the indent for a new PO
+  purchase_indents: {
+    special: ["po_no"],
+    renumber: ["component_code"],
+    extra: `IF OLD.po_no IS NOT NULL AND NOT (OLD.po_no <=> NEW.po_no)
+              AND NOT EXISTS (SELECT 1 FROM purchase_orders p WHERE p.po_no = OLD.po_no AND p.rejected_at IS NOT NULL) THEN
+              SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'purchase_indents.po_no is already recorded and cannot change';
+            END IF;`,
+  },
 };
 
 const same = (cols: string[]) => cols.map((c) => `OLD.\`${c}\` <=> NEW.\`${c}\``).join(" AND ");
@@ -94,9 +110,18 @@ async function columnsOf(conn: Connection, table: string): Promise<string[]> {
 }
 
 export async function installStageLocks(conn: Connection): Promise<void> {
-  for (const [table, rule] of Object.entries(RULES)) {
+  for (const [table, rules] of Object.entries(RULES)) {
     const cols = await columnsOf(conn, table);
     if (cols.length === 0) continue;
+    // an older migration may install the locks before later ones add a column: lock what exists (re-run at the end)
+    const has = (c: string) => cols.includes(c);
+    const rule: Rule = {
+      ...rules,
+      setOnce: rules.setOnce?.filter(has),
+      special: rules.special?.filter(has),
+      renumber: rules.renumber?.filter(has),
+      until: rules.until && { ...rules.until, cols: rules.until.cols.filter(has) },
+    };
     const managed = new Set([...(rule.setOnce ?? []), ...(rule.until?.cols ?? []), ...(rule.special ?? []), ...(rule.renumber ?? [])]);
     const locked = cols.filter((c) => !FREE.has(c) && !managed.has(c));
 

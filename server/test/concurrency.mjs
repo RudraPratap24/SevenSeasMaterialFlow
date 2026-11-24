@@ -24,7 +24,7 @@ console.log("concurrency: 8 GRNs at once get 8 distinct numbers");
 {
   const c = client(); await c("POST", "/api/auth/login", { username: "store", password: "seven@store" });
   const ge = (await c("GET", "/api/state")).json.state.gateEntries[0].id;
-  const body = { args: [{ gateEntryId: ge, gateLineNo: null, unit: "", componentCode: "PMS0002", componentName: "", type: "", brandName: "", receivedDate: "", poNo: "", poQty: null, invoiceNo: "", supplierName: "", qtyPerBox: 10, totalBoxes: 1, totalQty: 10, remarkStore: "", location: "" }] };
+  const body = { args: [{ gateEntryId: ge, gateLineNo: null, unit: "", componentCode: "PMS0002", componentName: "", type: "", brandName: "", receivedDate: "", poNo: "", poItemName: "", poQty: null, invoiceNo: "", supplierName: "", qtyPerBox: 10, totalBoxes: 1, totalQty: 10, remarkStore: "", location: "" }] };
   const rs = await Promise.all(Array.from({ length: 8 }, () => c("POST", "/api/actions/addGrnLine", body)));
   check("all 8 succeeded", rs.every((r) => r.status === 200), rs.map((r) => r.status).join(","));
   const nos = (await c("GET", "/api/state")).json.state.grnLines.map((g) => g.grnNo);
@@ -53,7 +53,9 @@ console.log("account lockout");
 {
   for (let i = 0; i < 5; i++) await client()("POST", "/api/auth/login", { username: "accounts", password: "wrong" + i });
   const r = await client()("POST", "/api/auth/login", { username: "accounts", password: "seven@accounts" });
-  check("locked after 5 failures even with right password", r.status === 429, JSON.stringify(r.json));
+  check("locked after 5 failures even with right password", r.status === 401, JSON.stringify(r.json));
+  const unknown = await client()("POST", "/api/auth/login", { username: "nobody-here", password: "x" });
+  check("…and the answer is the same as for an unknown login (no hint that the ID exists)", r.json?.error === unknown.json?.error && unknown.status === 401);
 }
 
 console.log("password change");
@@ -61,7 +63,12 @@ console.log("password change");
   const a = client(); const b = client();
   await a("POST", "/api/auth/login", { username: "security", password: "seven@security" });
   await b("POST", "/api/auth/login", { username: "security", password: "seven@security" });
-  check("weak password refused", (await a("POST", "/api/auth/change-password", { currentPassword: "seven@security", newPassword: "short" })).status === 400);
+  const weak = await a("POST", "/api/auth/change-password", { currentPassword: "seven@security", newPassword: "short" });
+  check("weak password refused", weak.status === 400, `${weak.status} ${JSON.stringify(weak.json)}`);
+  check("a default password refused", (await a("POST", "/api/auth/change-password", { currentPassword: "seven@security", newPassword: "seven@security" })).status === 400);
+  const { passwordProblem } = await (await import("tsx/esm/api")).tsImport("../src/authRoutes.ts", import.meta.url);
+  check("a strong password starting with Seven@ is fine (it was refused as 'too easy')", passwordProblem("Seven@Store2026!", "gate") === null);
+  check("…but the defaults themselves are not", passwordProblem("Seven@Gatekeeper", "store") !== null && passwordProblem("seven@admin", "store") !== null);
   check("wrong current refused", (await a("POST", "/api/auth/change-password", { currentPassword: "nope", newPassword: "Str0ng-Passw0rd!" })).status === 400);
   check("strong password accepted", (await a("POST", "/api/auth/change-password", { currentPassword: "seven@security", newPassword: "Str0ng-Passw0rd!" })).status === 200);
   check("other session signed out", (await b("GET", "/api/state")).status === 401);

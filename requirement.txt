@@ -1,0 +1,51 @@
+Seven Seas Material Flow — requirements
+=======================================
+
+This is a Node.js app, not a Python app: the packages below are installed by "npm install"
+from package.json / package-lock.json (do not use pip). This file is only the checklist.
+
+SOFTWARE TO INSTALL
+-------------------
+- Windows 10/11 (tested), or Linux/macOS
+- Node.js 20 or newer (tested with 24.21.0)  — https://nodejs.org  (npm comes with it; tested npm 11.19.0)
+- MySQL 8.x (tested 8.4.3) — easiest via Laragon (https://laragon.org), which includes it
+- TallyPrime (optional) — only for the Tally sync of items, vendors and POs; server on port 9000
+- A modern browser: Chrome or Edge
+
+PORTS USED
+----------
+- 4000  app server (API, and the built website after "npm run build")
+- 5173  website in development ("npm run dev")
+- 3306  MySQL          — keep blocked from the network
+- 9000  TallyPrime     — keep blocked from the network
+- 4001  test server (only while "npm test" runs)
+
+NPM PACKAGES (installed by "npm install", exact versions in package-lock.json)
+-------------------------------------------------------------------------------
+Runtime:
+  cookie-parser        1.4.7
+  dotenv               18.0.6
+  express              5.2.1
+  express-rate-limit   8.7.1
+  helmet               8.3.0
+  lucide-react         0.451.0
+  mysql2               3.24.5
+  react                18.3.1
+  react-dom            18.3.1
+  zod                  4.6.5
+
+Build / development:
+  @types/cookie-parser 1.4.10
+  @types/express       5.0.6
+  @types/node          26.6.4
+  @types/react         18.3.31
+  @types/react-dom     18.3.7
+  @vitejs/plugin-react 4.7.0
+  autoprefixer         10.5.4
+  concurrently         10.0.5
+  esbuild              0.28.2
+  postcss              8.5.26
+  tailwindcss          3.4.19
+  tsx                  4.23.15
+  typescript           5.9.3
+  vite                 5.4.21
