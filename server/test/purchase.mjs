@@ -56,7 +56,7 @@ const other = await newIndent("PMS0002", 100, "Shree Packwell");
 check("3 MAXCOMM indents + 1 Shree Packwell indent, vendor kept", [i1, i2, i3].every((i) => i?.supplierName === MAX) && other?.supplierName === "Shree Packwell");
 
 console.log("one PO for a vendor's ticked indents");
-const po = (indentIds, lines, supplierName = MAX) => ({ date: "", supplierName, lines, expectedDate: "", indentIds });
+const po = (indentIds, lines, supplierName = MAX, gst = "INTRA") => ({ date: "", supplierName, lines, expectedDate: "", indentIds, gst });
 const line = (componentCode, qty, rate = 2) => ({ componentCode, componentName: "", qty, rate });
 await refused("no indent ticked", purchase, "raisePo", [po([], [line("PMS0158", 1)])], /at least one indent/);
 await refused("an indent of another vendor", purchase, "raisePo", [po([i1.id, other.id], [line("PMS0158", 1000), line("PMS0002", 100)])], /is for Shree Packwell/);
@@ -64,6 +64,7 @@ await refused("a ticked indent's item missing from the PO", purchase, "raisePo",
 await refused("an item without a ticked indent", purchase, "raisePo", [po([i1.id], [line("PMS0158", 1000), line("PMS0164", 5)])], /no ticked indent/);
 await refused("the same item on two lines", purchase, "raisePo", [po([i1.id, i3.id], [line("PMS0158", 1000), line("PMS0158", 500)])], /only once/);
 await refused("an indent without a rate", purchase, "addIndent", [{ ...indent("PMS0158", 10), rate: null }], /rate/);
+await refused("a PO without GST chosen", purchase, "raisePo", [{ ...po([i1.id], [line("PMS0158", 1500)]), gst: undefined }], /GST|same state|gst/i);
 await refused("a PO line without a rate", purchase, "raisePo", [po([i1.id, i2.id, i3.id], [line("PMS0158", 1500, null), line("PMS0160", 1000)])], /rate/);
 const raised = await act(purchase, "raisePo", [po([i1.id, i2.id, i3.id], [line("PMS0158", 1500, 2.1), line("PMS0160", 1000, 1.6)])]);
 const PO = raised.json?.changes?.purchaseOrders?.at(-1);
@@ -71,55 +72,89 @@ check("ONE PO: 3 indents, 2 lines (LL-112 bottle 1500, cap 1000)", raised.status
 check("the indent keeps its rate", i1?.rate === 2.1, JSON.stringify(i1));
 const value = L.derivePoProgress([PO], [], []).at(0)?.value;
 check("the PO has its total: 1500 × 2.1 + 1000 × 1.6 = 4750", value === 4750, String(value));
+check("it keeps the GST Purchase chose (same state)", PO?.gst === "INTRA", JSON.stringify(PO?.gst));
+const intra = L.gstSplit(4750, "INTRA"), inter = L.gstSplit(4750, "INTER");
+check("same state: CGST 9% 427.5 + SGST 9% 427.5 = 5605", intra.cgst === 427.5 && intra.sgst === 427.5 && intra.igst === 0 && intra.total === 5605, JSON.stringify(intra));
+check("other state: IGST 18% 855 = 5605", inter.igst === 855 && inter.cgst === 0 && inter.total === 5605, JSON.stringify(inter));
+const odd = L.gstSplit(10.05, "INTRA");
+check("each head rounded to paise; total = sum of heads", odd.cgst === 0.9 && odd.total === 11.85, JSON.stringify(odd));
 check("its number is new — not one a Tally PO already has", !(await state(gate)).tallyPos.some((p) => p.poNo === PO?.id), PO?.id);
 const inds = (await state(purchase)).indents.filter((i) => [i1.id, i2.id, i3.id].includes(i.id));
 check("all three indents now PO_RAISED", inds.every((i) => i.status === "PO_RAISED"));
 await refused("an indent can't go on a second PO", purchase, "raisePo", [po([i1.id], [line("PMS0158", 1)])], /already has a PO/);
 
-console.log("the gate sees it only once the owner approves");
-const openAtGate = async () => {
-  const s = await state(gate);
+console.log("the owner rejects a PO: its indents are open again");
+const rj = await act(purchase, "raisePo", [po([other.id], [line("PMS0002", 100, 3)], "Shree Packwell")]);
+const RJ = rj.json?.changes?.purchaseOrders?.at(-1);
+await refused("Purchase can't reject", purchase, "rejectPo", [RJ.id, "too costly", ""], null);
+await refused("a reason is needed", admin, "rejectPo", [RJ.id, " ", ""], null);
+const rjd = await act(admin, "rejectPo", [RJ.id, "rate too high", ""]);
+check("owner rejects with a reason", rjd.status === 200, JSON.stringify(rjd.json));
+let sp2 = await state(purchase);
+const rjPo = sp2.purchaseOrders.find((p) => p.id === RJ.id);
+check("…REJECTED with who and why, no indents left on it", rjPo?.status === "REJECTED" && rjPo.rejectReason === "rate too high" && rjPo.rejectedBy && rjPo.indentIds.length === 0, JSON.stringify(rjPo));
+check("…its indent is OPEN again", sp2.indents.find((i) => i.id === other.id)?.status === "OPEN");
+await refused("a rejected PO can't be approved", admin, "approvePo", [RJ.id, ""], /rejected/);
+await refused("…or rejected twice", admin, "rejectPo", [RJ.id, "again", ""], /already rejected/);
+const again = await act(purchase, "raisePo", [po([other.id], [line("PMS0002", 100, 2.5)], "Shree Packwell")]);
+check("the freed indent goes on a new PO", again.status === 200 && again.json.changes.purchaseOrders.at(-1).indentIds.includes(other.id), JSON.stringify(again.json));
+
+console.log("Store can receive against it only once the owner approves");
+const openForGrn = async () => {
+  const s = await state(store);
   return L.deriveTallyPoProgress(L.gatePos(s), s.gateEntries, s.grnLines).filter((p) => p.open);
 };
-check("pending approval: not at the gate", !(await openAtGate()).some((p) => p.po.poNo === PO.id));
-const gateEntry = (lines) => ({
-  date: "", supplierName: "", productDesc: "", invoiceNo: `P-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, invoiceDate: "",
-  poNo: PO.id, invoiceQty: null, transportName: "", lrNo: "", vehicleNo: "HR55-P-0001", timeIn: "00:00", timeOut: "", driverSign: false, remark: "",
-  lines: lines.map(([itemName, qty]) => ({ itemName, itemCode: "", unit: "", qty, remark: "" })),
+check("pending approval: not open for GRN", !(await openForGrn()).some((p) => p.po.poNo === PO.id));
+const ge = (await act(gate, "addGateEntry", [{
+  supplierName: MAX, invoiceNo: `P-${Date.now().toString(36)}`, invoiceDate: "", invoiceQty: 2, invoiceQtyUnit: "Box",
+  transportName: "", lrNo: "", vehicleNo: "HR55-P-0001", driverName: "", driverPhone: "",
+}])).json?.changes?.gateEntries?.at(-1);
+const grnLine = (poItemName, componentCode, totalQty, remarkStore = "") => ({
+  gateEntryId: ge.id, gateLineNo: null, componentCode, componentName: "", type: "", brandName: "SEVEN SEAS", receivedDate: "",
+  poNo: PO.id, poItemName, poQty: null, invoiceNo: "", supplierName: "", qtyPerBox: null, totalBoxes: null, totalQty, unit: "", remarkStore,
+  location: "Store \u2014 Floor 1",
 });
-await refused("gate entry before approval", gate, "addGateEntry", [gateEntry([["LL-112 BOTTLE", 10]])], /waiting for the owner's approval/);
+await refused("GRN before approval", store, "addGrnLine", [grnLine("LL-112 BOTTLE", "PMS0158", 10)], /not among the open purchase orders/);
 check("owner approves", (await act(admin, "approvePo", [PO.id, ""])).status === 200);
-const open = await openAtGate();
-const atGate = open.find((p) => p.po.poNo === PO.id);
-check("approved: at the gate with its 2 items in Pcs", atGate?.lines.length === 2 && atGate.lines.every((l) => l.unit === "Pcs"), JSON.stringify(atGate));
+const open = await openForGrn();
+const forGrn = open.find((p) => p.po.poNo === PO.id);
+check("approved: open for GRN with its 2 items in Pcs", forGrn?.lines.length === 2 && forGrn.lines.every((l) => l.unit === "Pcs"), JSON.stringify(forGrn));
 for (const term of [PO.id, "maxcomm", "pms0160"]) check(`  found by "${term}"`, L.searchPos(open, term).some((p) => p.po.poNo === PO.id));
-check("the gate never receives PO rates", (await state(gate)).purchaseOrders.every((p) => p.lines.every((l) => l.rate === null)));
+check("Store never receives PO rates", (await state(store)).purchaseOrders.every((p) => p.lines.every((l) => l.rate === null)));
 
-console.log("gate in and GRN against it");
-const ge = (await act(gate, "addGateEntry", [gateEntry([["LL-112 BOTTLE", 1500], ["LL-112 CAP", 600]])])).json?.changes?.gateEntries?.at(-1);
-check("gate entry with 2 items, codes from the PO", ge?.lines.map((l) => l.itemCode).join() === "PMS0158,PMS0160", JSON.stringify(ge));
-const grn = await act(store, "addGrnLine", [{
-  gateEntryId: ge.id, gateLineNo: 1, componentCode: "PMS0158", componentName: "", type: "", brandName: "SEVEN SEAS", receivedDate: "",
-  poNo: "", poQty: null, invoiceNo: "", supplierName: "", qtyPerBox: null, totalBoxes: null, totalQty: 1400, unit: "", remarkStore: "100 short",
-  location: "Store — Floor 1",
-}]);
+console.log("GRN against it (Store picks the PO)");
+const grn = await act(store, "addGrnLine", [grnLine("LL-112 BOTTLE", "PMS0158", 1400, "100 short")]);
 const g = grn.json?.changes?.grnLines?.at(-1);
 check("GRN: PO no and PO qty from the app PO", g?.poNo === PO.id && g.poQty === 1500 && g.unit === "Pcs", JSON.stringify(grn.json));
+check("1400 of 1500 is within 20%: the bottle is complete", g?.variance === "" && g.closesItem === true);
+const cap = await act(store, "addGrnLine", [grnLine("LL-112 CAP", "PMS0160", 600)]);
+check("600 of 1000 caps: more than 20% short — SHORT (escalation), the cap item is closed", cap.json?.changes?.grnLines?.at(-1)?.variance === "SHORT" && cap.json.changes.grnLines.at(-1).closesItem === true, JSON.stringify(cap.json));
+const capGrn = cap.json.changes.grnLines.at(-1).grnNo;
+const shortDn = (who, o = {}) => act(who, "escalationDebitNote", [{ grnNo: capGrn, qty: 400, rate: 1.6, reason: "invoiced 1000, 600 came", ...o }]);
+check("short debit note: Store can't", (await shortDn(store)).status === 403);
+check("short debit note: needs a reason", (await shortDn(purchase, { reason: " " })).status === 400);
+const sdn = await shortDn(purchase);
+const sNote = sdn.json?.changes?.debitNotes?.at(-1);
+check("short debit note: SHORT SUPPLY note for 400 × ₹1.6, the escalation closed with its number",
+  sdn.status === 200 && sNote?.kind === "SHORT_SUPPLY" && sNote.qty === 400 && sNote.amount === 640 && sNote.arNo === "" &&
+  sdn.json.changes.escalationClosures?.find((c) => c.grnNo === capGrn)?.resolution.startsWith(`Debit note ${sNote.id}`), JSON.stringify(sdn.json));
+check("short debit note: once (the escalation is closed)", (await shortDn(purchase)).status === 409);
+check("the note reads back as SHORT SUPPLY", (await state(purchase)).debitNotes.find((n) => n.id === sNote?.id)?.kind === "SHORT_SUPPLY");
 const db = await mysql.createConnection({
   host: process.env.DB_HOST, port: Number(process.env.DB_PORT ?? 3306), user: process.env.DB_USER,
   password: process.env.DB_PASSWORD, database: process.env.DB_NAME,
 });
-const [[row]] = await db.query("SELECT po_no, tally_po_no FROM gate_entries WHERE gate_entry_no = ?", [ge.id]);
-check("stored as a link to the app PO", row?.po_no === PO.id && row.tally_po_no === null, JSON.stringify(row));
+const [[row]] = await db.query("SELECT po_no, tally_po_no FROM goods_receipts WHERE grn_no = ?", [g?.grnNo]);
+check("the GRN is stored as a link to the app PO", row?.po_no === PO.id && row.tally_po_no === null, JSON.stringify(row));
 await db.end();
 
 console.log("one pending figure everywhere");
 const sp = await state(purchase);
 const onPurchase = L.derivePoProgress(sp.purchaseOrders, sp.gateEntries, sp.grnLines).find((p) => p.po.id === PO.id);
-const onGate = (await openAtGate()).find((p) => p.po.poNo === PO.id);
+const onStore = (await openForGrn()).find((p) => p.po.poNo === PO.id);
 const pend = (lines, code) => lines.find((l) => (l.code ?? l.itemCode) === code)?.pending;
-check("bottle 1500 − counted 1400 = 100 pending on both screens", pend(onPurchase.lines, "PMS0158") === 100 && pend(onGate.lines, "PMS0158") === 100);
-check("cap 1000 − 600 at gate = 400 pending on both screens", pend(onPurchase.lines, "PMS0160") === 400 && pend(onGate.lines, "PMS0160") === 400);
+check("bottle and short cap both closed: 0 pending, the PO closed", pend(onPurchase.lines, "PMS0158") === 0 && pend(onPurchase.lines, "PMS0160") === 0 && onPurchase.closed);
+check("…and no longer open for GRN at Store", onStore === undefined);
 
 console.log("the librarian learns what Tally has confirmed");
 const status = async () => L.tallyStatusOf((await state(purchase)).purchaseOrders.find((p) => p.id === PO.id), (await state(purchase)).tallyPos);
@@ -138,16 +173,16 @@ const voucher = (items) => `<ENVELOPE><BODY><IMPORTDATA><REQUESTDATA><TALLYMESSA
   </VOUCHER></TALLYMESSAGE></REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>`;
 tallyRead("same.xml", voucher([["LL-112 BOTTLE", 1500], ["LL-112 CAP", 1000]]));
 check("read back with the same items: IN TALLY", (await status()) === "IN_TALLY");
-const copyLines = (await state(gate)).tallyPos.find((p) => p.poNo === PO.id)?.lines ?? [];
+const copyLines = (await state(store)).tallyPos.find((p) => p.poNo === PO.id)?.lines ?? [];
 const cl = (n) => copyLines.find((l) => l.itemName === n)?.itemCode;
-check("a name the master gives to 2 components (LL-112 CAP: PMS0160, PMS0171) gets no guessed code", cl("LL-112 CAP") === "", JSON.stringify(copyLines));
+check("a name the master gives to 2 components (LL-112 CAP: PMS0160, PMS0171) is never guessed \u2014 it gets the code Store picked at GRN", cl("LL-112 CAP") === "PMS0160", JSON.stringify(copyLines));
 check("…unless Store already picked one at GRN (LL-112 BOTTLE → PMS0158, remembered)", cl("LL-112 BOTTLE") === "PMS0158", JSON.stringify(copyLines));
-const both = L.gatePos(await state(gate)).filter((p) => p.poNo === PO.id);
-check("shown once at the gate — from the app's own record (Tally's copy only confirms it)", both.length === 1 && both[0].syncedAt === "" && both[0].date === PO.date, JSON.stringify(both));
-const atGateNow = L.deriveTallyPoProgress(both, (await state(gate)).gateEntries, (await state(gate)).grnLines)[0];
-check("receipts still count against it (bottle 100, cap 400 pending)",
-  atGateNow.lines.find((l) => l.itemName === "LL-112 BOTTLE")?.pending === 100 && atGateNow.lines.find((l) => l.itemName === "LL-112 CAP")?.pending === 400,
-  JSON.stringify(atGateNow.lines));
+const both = L.gatePos(await state(store)).filter((p) => p.poNo === PO.id);
+check("shown once for GRN \u2014 from the app's own record (Tally's copy only confirms it)", both.length === 1 && both[0].syncedAt === "" && both[0].date === PO.date, JSON.stringify(both));
+const forGrnNow = L.deriveTallyPoProgress(both, (await state(store)).gateEntries, (await state(store)).grnLines)[0];
+check("receipts still count against it (bottle 0, cap 0 pending)",
+  forGrnNow.lines.find((l) => l.itemName === "LL-112 BOTTLE")?.pending === 0 && forGrnNow.lines.find((l) => l.itemName === "LL-112 CAP")?.pending === 0,
+  JSON.stringify(forGrnNow.lines));
 tallyRead("edited.xml", voucher([["LL-112 BOTTLE", 1200], ["LL-112 CAP", 1000]]));
 check("someone changed it in Tally: DIFFERS", (await status()) === "DIFFERS");
 

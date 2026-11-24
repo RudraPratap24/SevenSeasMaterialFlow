@@ -56,3 +56,23 @@ export async function api<T>(method: "GET" | "POST", path: string, body?: unknow
   }
   return data as T;
 }
+
+/** Sends one JPEG (the gate photo) as the request body. */
+export async function apiUpload(path: string, photo: Blob): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "X-Flow-Request": "1", "Content-Type": "image/jpeg" },
+      body: photo,
+    });
+  } catch {
+    throw new ApiError(0, "Cannot reach the server. Check the network connection and try again.");
+  }
+  if (!res.ok) {
+    const err = ((await res.json().catch(() => null)) ?? {}) as { error?: string };
+    if (res.status === 401) unauthorizedListeners.forEach((fn) => fn());
+    throw new ApiError(res.status, err.error ?? `The photo was not saved (${res.status}).`);
+  }
+}

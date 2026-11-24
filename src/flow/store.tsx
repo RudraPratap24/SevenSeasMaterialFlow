@@ -22,6 +22,7 @@ import {
   type ActionArgs,
   type ActionName,
   type FgStockRow,
+  type OpenBom,
   type OrderProgress,
   type PmStockRow,
   type PoProgress,
@@ -74,10 +75,15 @@ interface FlowApi {
   poProgress: PoProgress[];
   orderProgress: OrderProgress[];
   /** Components below their minimum level — the purchase short list. */
-  shortList: PmStockRow[];
   /** Approved suppliers with fixed rates — only for roles that may see prices. */
   suppliers: Supplier[];
   masters: MasterLists;
+  /** BOM lists holding PM stock (soft reservation) — for roles that see PM stock or production. */
+  openBoms: OpenBom[];
+  /** Re-reads the open BOM lists now (after making or cancelling one). */
+  reloadReservations(): Promise<void>;
+  /** Goes up whenever BOM lists or indent requests change on the server — screens that read them re-read. */
+  productionTick: number;
   epoch: number;
   hasData: boolean;
   loaded: boolean;
@@ -93,6 +99,10 @@ interface FlowApi {
   updateGrnQty: Mutation<"updateGrnQty">;
   sendToQc: Mutation<"sendToQc">;
   recordAr: Mutation<"recordAr">;
+  addDebitNote: Mutation<"addDebitNote">;
+  closeEscalation: Mutation<"closeEscalation">;
+  escalationDebitNote: Mutation<"escalationDebitNote">;
+  escalationIndent: Mutation<"escalationIndent">;
   setBarcoded: Mutation<"setBarcoded">;
   addRequisition: Mutation<"addRequisition">;
   issueRequisition: Mutation<"issueRequisition">;
@@ -107,6 +117,7 @@ interface FlowApi {
   addIndent: Mutation<"addIndent">;
   raisePo: Mutation<"raisePo">;
   approvePo: Mutation<"approvePo">;
+  rejectPo: Mutation<"rejectPo">;
   closePo: Mutation<"closePo">;
   reopenPo: Mutation<"reopenPo">;
   closePosBefore: Mutation<"closePosBefore">;
@@ -157,6 +168,19 @@ export function FlowProvider({ children }: { children: ReactNode }) {
   const resyncVersion = useRef(-1);
   const mastersVersion = useRef(-1);
   const inFlight = useRef(false);
+  const [openBoms, setOpenBoms] = useState<OpenBom[]>([]);
+  const productionVersion = useRef("");
+  const [productionTick, setProductionTick] = useState(0);
+  const seesReservations = Boolean(user?.tabs.some((t) => t === "production" || t === "pmstock"));
+
+  const reloadReservations = useCallback(async () => {
+    if (!seesReservations) return;
+    try {
+      setOpenBoms((await api<{ open: OpenBom[] }>("GET", "/production-reservations")).open);
+    } catch {
+      /* the next change tries again */
+    }
+  }, [seesReservations]);
 
   const applyFull = useCallback((r: FullResponse) => {
     version.current = r.version;
@@ -200,11 +224,17 @@ export function FlowProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshMasters();
     void refresh();
+    void reloadReservations();
     const timer = window.setInterval(async () => {
       if (inFlight.current || document.hidden || version.current < 0) return;
       try {
-        const v = await api<{ version: number; resyncVersion: number; mastersVersion: number }>("GET", "/version");
+        const v = await api<{ version: number; resyncVersion: number; mastersVersion: number; productionVersion: string }>("GET", "/version");
         if (v.mastersVersion !== mastersVersion.current) await refreshMasters();
+        if (v.productionVersion !== productionVersion.current) {
+          productionVersion.current = v.productionVersion;
+          setProductionTick((n) => n + 1);
+          await reloadReservations();
+        }
         if (inFlight.current) return;
         if (v.resyncVersion !== resyncVersion.current) await refresh();
         else if (v.version !== version.current) await catchUp();
@@ -213,7 +243,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       }
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [refresh, refreshMasters, catchUp]);
+  }, [refresh, refreshMasters, catchUp, reloadReservations]);
 
   useEffect(() => {
     if (!user || !PRICE_ROLES.includes(user.role)) return;
@@ -258,17 +288,10 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         state.openings,
         state.minLevels,
         masters.components,
+        state.bomIssues,
       ).values(),
     ],
-    [state.grnLines, state.requisitions, state.mrns, state.openings, state.minLevels, masters.components],
-  );
-
-  const shortList = useMemo(
-    () =>
-      pmStock
-        .filter((r) => r.minLevel !== null && r.closing < r.minLevel)
-        .sort((a, b) => (b.minLevel! - b.closing) - (a.minLevel! - a.closing)),
-    [pmStock],
+    [state.grnLines, state.requisitions, state.mrns, state.openings, state.minLevels, masters.components, state.bomIssues],
   );
 
   const fgStock = useMemo(
@@ -333,9 +356,11 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       fgStock,
       poProgress,
       orderProgress,
-      shortList,
       suppliers,
       masters,
+      openBoms,
+      reloadReservations,
+      productionTick,
       epoch,
       hasData,
       loaded,
@@ -349,6 +374,10 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       updateGrnQty: action("updateGrnQty"),
       sendToQc: action("sendToQc"),
       recordAr: action("recordAr"),
+      addDebitNote: action("addDebitNote"),
+      closeEscalation: action("closeEscalation"),
+      escalationDebitNote: action("escalationDebitNote"),
+      escalationIndent: action("escalationIndent"),
       setBarcoded: action("setBarcoded"),
       addRequisition: action("addRequisition"),
       issueRequisition: action("issueRequisition"),
@@ -363,6 +392,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       addIndent: action("addIndent"),
       raisePo: action("raisePo"),
       approvePo: action("approvePo"),
+      rejectPo: action("rejectPo"),
       closePo: action("closePo"),
       reopenPo: action("reopenPo"),
       closePosBefore: action("closePosBefore"),
@@ -371,7 +401,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       traceBatch: (batchNo) => traceBatchOf(state, batchNo),
       traceGrn: (grnNo) => traceGrnOf(state, grnNo),
     };
-  }, [state, pmStock, fgStock, poProgress, orderProgress, shortList, suppliers, masters, epoch, loaded, busy, error, send, applyFull, refresh]);
+  }, [state, pmStock, fgStock, poProgress, orderProgress, suppliers, masters, openBoms, reloadReservations, productionTick, epoch, loaded, busy, error, send, applyFull, refresh]);
 
   return <Ctx.Provider value={api_}>{children}</Ctx.Provider>;
 }

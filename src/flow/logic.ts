@@ -7,7 +7,10 @@
  * when the SOP forbids the action (over-issue, dispatch without PDI, …).
  */
 import type { TabId } from "./perms";
-import type {
+import type { GstType,
+  BomIssue,
+  BomLine,
+  DebitNote,
   ComponentInfo,
   CustOrder,
   DispatchSlip,
@@ -53,6 +56,9 @@ export function emptyState(): FlowState {
     purchaseOrders: [],
     tallyPos: [],
     poClosures: [],
+    debitNotes: [],
+    escalationClosures: [],
+    bomIssues: [],
   };
 }
 
@@ -81,6 +87,7 @@ export const SERIES = {
   DPS: { prefix: "DPS-", pad: 4 },
   IND: { prefix: "IND-", pad: 4 },
   PO: { prefix: "26SEV", pad: 3 },
+  DN: { prefix: "DN-", pad: 4 },
 } as const;
 export type Series = keyof typeof SERIES;
 
@@ -113,6 +120,9 @@ export const DOC_KEYS = {
   purchaseOrders: "id",
   tallyPos: "poNo",
   poClosures: "poNo",
+  debitNotes: "id",
+  escalationClosures: "grnNo",
+  bomIssues: "bomNo",
 } as const;
 export type DocCollection = keyof typeof DOC_KEYS;
 export const DOC_COLLECTIONS = Object.keys(DOC_KEYS) as DocCollection[];
@@ -201,6 +211,7 @@ export function derivePmStock(
   openings: Record<string, number>,
   minLevels: Record<string, number>,
   components: ComponentInfo[] = [],
+  bomIssues: BomIssue[] = [],
 ): Map<string, PmStockRow> {
   const rows = new Map<string, PmStockRow>();
   const unitOf = new Map(components.map((c) => [c.code, c.unit]));
@@ -237,8 +248,12 @@ export function derivePmStock(
     const r = sameUnit(g.unit, own)
       ? row(g.componentCode, g.componentName, g.type)
       : row(`${g.componentCode} · ${g.unit}`, g.componentName, g.type, g.unit);
-    if (g.qcStatus === "APPROVED") r.received += g.totalQty;
-    else if (g.qcStatus === "UNDER_TEST") r.underTest += g.totalQty;
+    // QC may accept part of a lot: only that part is usable stock, the rest is rejected (debit note)
+    if (g.qcStatus === "APPROVED") {
+      const accepted = g.acceptedQty ?? g.totalQty;
+      r.received += accepted;
+      r.rejected += r3(g.totalQty - accepted);
+    } else if (g.qcStatus === "UNDER_TEST") r.underTest += g.totalQty;
     else if (g.qcStatus === "HOLD") r.hold += g.totalQty;
     else r.rejected += g.totalQty;
   }
@@ -247,6 +262,14 @@ export function derivePmStock(
   }
   for (const m of mrns) {
     for (const line of m.lines) row(line.componentCode, line.componentName).returned += line.qty;
+  }
+  // PM given to production against a BOM list (the BOM issue slip)
+  for (const b of bomIssues) {
+    for (const line of b.lines) {
+      const r = row(line.componentCode, line.componentName);
+      r.issued += line.issuedQty;
+      r.returned += line.returnedQty ?? 0;
+    }
   }
   for (const r of rows.values()) r.closing = r.opening + r.received - r.issued + r.returned;
   return rows;
@@ -298,6 +321,21 @@ export function deriveFgStock(state: {
 
 /* ── purchase + order derivations ───────────────────────────────────────────── */
 
+/** GST on a PO (18%): same state → CGST 9% + SGST 9%; another state → IGST 18%. Each head rounded to paise. */
+export function gstSplit(taxable: number, gst: GstType | undefined) {
+  const paise = (n: number) => Math.round(n * 100) / 100;
+  const base = paise(taxable);
+  const cgst = gst === "INTRA" ? paise(base * 0.09) : 0;
+  const sgst = cgst;
+  const igst = gst === "INTER" ? paise(base * 0.18) : 0;
+  return { taxable: base, cgst, sgst, igst, total: paise(base + cgst + sgst + igst) };
+}
+
+export const GST_LABEL: Record<GstType, string> = {
+  INTRA: "Same state — CGST 9% + SGST 9%",
+  INTER: "Other state — IGST 18%",
+};
+
 export interface PoProgress {
   po: PurchaseOrder;
   /** Per-line received (arrived at gate, any QC status) and pending. */
@@ -342,22 +380,42 @@ interface Arrival {
   itemName: string;
   itemCode: string;
   qty: number;
+  /** This receipt completes the PO item (GRN within the tolerance, or excess). */
+  closes: boolean;
 }
 
 /**
- * What has come in against a PO. Per gate-checked item: Store's GRN count once the GRN exists, else the
- * quantity checked in at the gate. Gate entries from before item-wise check-in (no items): their GRNs.
+ * What has come in against a PO: the GRNs Store made against it (the PO is picked at GRN). Older gate entries that
+ * named the PO still count as before — per gate-checked item Store's GRN count, else the gate quantity.
  */
 function arrivalsFor(poNo: string, gateEntries: GateEntry[], grnLines: GrnLine[]): Arrival[] {
-  return gateEntries
+  const older = gateEntries
     .filter((g) => g.poNo === poNo)
     .flatMap((g): Arrival[] =>
       g.lines.length > 0
-        ? g.lines.map((l, i) => ({ itemName: l.itemName, itemCode: l.itemCode, qty: grnOf(grnLines, g.id, i + 1)?.totalQty ?? l.qty }))
+        ? g.lines.map((l, i) => ({ itemName: l.itemName, itemCode: l.itemCode, qty: grnOf(grnLines, g.id, i + 1)?.totalQty ?? l.qty, closes: false }))
         : grnLines
-            .filter((r) => r.gateEntryId === g.id)
-            .map((r) => ({ itemName: r.componentName, itemCode: r.componentCode, qty: r.totalQty })),
+            .filter((r) => r.gateEntryId === g.id && !r.poItemName)
+            .map((r) => ({ itemName: r.componentName, itemCode: r.componentCode, qty: r.totalQty, closes: false })),
     );
+  const counted = grnLines
+    .filter((r) => r.poItemName && r.poNo === poNo)
+    // a SHORT GRN also completes its item (older ones were stored as open): the rest is decided in Escalation
+    .map((r) => ({ itemName: r.poItemName, itemCode: r.poItemCode, qty: r.totalQty, closes: r.closesItem || r.variance !== "" }));
+  return [...older, ...counted];
+}
+
+/** Tolerance on Store's count against what is pending on a PO item (client: ±20%). */
+export const GRN_TOLERANCE = 0.2;
+
+/**
+ * A GRN count against what is still pending on the PO item. It always completes the item — the PO does not wait for
+ * more. Beyond ±20% it is also flagged (more than 20% short: SHORT; more than 20% over, all accepted: EXCESS) and goes
+ * to the escalation tab, where Purchase decides what happens (e.g. a new PO for the balance).
+ */
+export function grnVariance(pending: number, qty: number): { variance: GrnLine["variance"]; closesItem: boolean } {
+  const variance = qty < r3(pending * (1 - GRN_TOLERANCE)) ? "SHORT" : qty > r3(pending * (1 + GRN_TOLERANCE)) ? "EXCESS" : "";
+  return { variance, closesItem: true };
 }
 
 /** The same PO item: by PMS code when both sides have one, else by name. */
@@ -368,6 +426,10 @@ const sameItem = (a: { itemName: string; itemCode: string }, b: { itemName: stri
 // that receipt counting — match on Tally's line id once the live Tally API supplies it.
 const receivedOf = (arrived: Arrival[], item: { itemName: string; itemCode: string }) =>
   r3(arrived.filter((a) => sameItem(a, item)).reduce((n, a) => n + a.qty, 0));
+
+/** Pending on a PO item: nothing once a GRN completed it (within the tolerance), else ordered − received. */
+const pendingOf = (arrived: Arrival[], item: { itemName: string; itemCode: string; qty: number }, received: number) =>
+  arrived.some((a) => a.closes && sameItem(a, item)) ? 0 : Math.max(0, r3(item.qty - received));
 
 /**
  * The POs the gate receives against, one per number: POs raised and approved in this app, from the app's own record
@@ -420,14 +482,15 @@ export function derivePoProgress(purchaseOrders: PurchaseOrder[], gateEntries: G
   return purchaseOrders.map((po) => {
     const arrived = arrivalsFor(po.id, gateEntries, grnLines);
     const lines = po.lines.map((l) => {
-      const received = receivedOf(arrived, { itemName: l.componentName, itemCode: l.componentCode });
+      const item = { itemName: l.componentName, itemCode: l.componentCode, qty: l.qty };
+      const received = receivedOf(arrived, item);
       return {
         code: l.componentCode,
         name: l.componentName,
         qty: l.qty,
         rate: l.rate,
         received,
-        pending: Math.max(0, r3(l.qty - received)),
+        pending: pendingOf(arrived, item, received),
       };
     });
     const value = po.lines.every((l) => l.rate !== null)
@@ -456,7 +519,7 @@ export function deriveTallyPoProgress(pos: TallyPo[], gateEntries: GateEntry[], 
     const arrived = arrivalsFor(po.poNo, gateEntries, grnLines);
     const lines = po.lines.map((l) => {
       const received = receivedOf(arrived, l);
-      return { ...l, received, pending: Math.max(0, r3(l.qty - received)) };
+      return { ...l, received, pending: pendingOf(arrived, l, received) };
     });
     return { po, lines, open: !po.cancelled && !po.closed && lines.some((l) => l.pending > 0) };
   });
@@ -499,6 +562,186 @@ export function searchAwaitingGrn(items: AwaitingGrn[], term: string): AwaitingG
   );
 }
 
+/** The GRNs Store counted more than 20% short or over what was pending (SHORT / EXCESS), not yet closed. */
+/** A PM item a production plan needs: BOM qty per 100 × target, summed across the plan's products. */
+export interface PlanMaterial {
+  code: string;
+  name: string;
+  required: number;
+  /** PM stock on hand (closing). */
+  onHand: number;
+  /** Held by open BOM lists ahead of this plan in the queue. */
+  reservedOthers: number;
+  /** What this plan can count on: on hand − reserved by others. */
+  present: number;
+  short: number;
+  unit: string;
+  skus: string[];
+}
+
+/** A BOM list that holds PM stock: the latest of its plan date, not issued, not cancelled. */
+export interface OpenBom {
+  bomNo: string;
+  /** yyyy-mm-dd */
+  planDate: string;
+  /** ISO time it was generated */
+  createdAt: string;
+  lines: { code: string; required: number }[];
+}
+
+export interface PmReservation {
+  /** Stock left for this BOM list when its turn comes. */
+  availableBefore: number;
+  reserved: number;
+  short: number;
+}
+
+/**
+ * Soft reservation, worked out (never stored): open BOM lists take PM stock in queue order — earlier plan date first,
+ * then the one generated first. Cancelling, superseding or issuing a BOM list just changes the queue.
+ */
+export function reservePm(open: OpenBom[], onHand: Map<string, number>): Map<string, Map<string, PmReservation>> {
+  const left = new Map<string, number>();
+  const out = new Map<string, Map<string, PmReservation>>();
+  const queue = [...open].sort((a, b) => a.planDate.localeCompare(b.planDate) || a.createdAt.localeCompare(b.createdAt));
+  for (const bom of queue) {
+    const mine = new Map<string, PmReservation>();
+    for (const l of bom.lines) {
+      const avail = Math.max(0, left.get(l.code) ?? onHand.get(l.code) ?? 0);
+      const reserved = Math.min(l.required, avail);
+      left.set(l.code, avail - reserved);
+      mine.set(l.code, { availableBefore: avail, reserved, short: l.required - reserved });
+    }
+    out.set(bom.bomNo, mine);
+  }
+  return out;
+}
+
+/** Reserved per PM item across all open BOM lists. */
+export function reservedTotals(open: OpenBom[], onHand: Map<string, number>): Map<string, number> {
+  const total = new Map<string, number>();
+  for (const m of reservePm(open, onHand).values()) {
+    for (const [code, r] of m) total.set(code, (total.get(code) ?? 0) + r.reserved);
+  }
+  return total;
+}
+
+/**
+ * What a plan needs against PM stock — short items first. Same sums on the screen and in the saved BOM document.
+ * With `queue`, the plan takes its place among the open BOM lists (its own date's list left out): stock held by plans
+ * ahead of it is not available to it.
+ */
+export function planMaterials(
+  lines: { productName: string; qty: number }[],
+  bomOf: (productName: string) => BomLine[],
+  skuOf: (productName: string) => string,
+  pmStock: PmStockRow[],
+  queue?: { open: OpenBom[]; planDate: string },
+): PlanMaterial[] {
+  const stockOf = new Map(pmStock.map((s) => [s.code, s]));
+  const need = new Map<string, { code: string; name: string; qty: number; skus: Set<string> }>();
+  for (const l of lines) {
+    for (const b of bomOf(l.productName)) {
+      const m = need.get(b.c) ?? { code: b.c, name: b.n, qty: 0, skus: new Set<string>() };
+      m.qty += (l.qty * b.p) / 100;
+      m.skus.add(skuOf(l.productName) || l.productName);
+      need.set(b.c, m);
+    }
+  }
+  const rows = [...need.values()].map((m) => ({ ...m, required: Math.ceil(m.qty - 1e-9), onHand: Math.max(0, stockOf.get(m.code)?.closing ?? 0) }));
+  const SELF = "~this plan~";
+  const mine = queue
+    ? reservePm(
+        [
+          ...queue.open.filter((b) => b.planDate !== queue.planDate),
+          // after any list of the same date generated earlier — there is none (left out above), so "last" is safe
+          { bomNo: SELF, planDate: queue.planDate, createdAt: "~", lines: rows.map((r) => ({ code: r.code, required: r.required })) },
+        ],
+        new Map(rows.map((r) => [r.code, r.onHand])),
+      ).get(SELF)
+    : undefined;
+  return rows
+    .map((m) => {
+      const present = mine?.get(m.code)?.availableBefore ?? m.onHand;
+      const s = stockOf.get(m.code);
+      return {
+        code: m.code,
+        name: m.name,
+        required: m.required,
+        onHand: m.onHand,
+        reservedOthers: m.onHand - present,
+        present,
+        short: Math.max(0, m.required - present),
+        unit: s?.unit || "Pcs",
+        skus: [...m.skus],
+      };
+    })
+    .sort((a, b) => Number(b.short > 0) - Number(a.short > 0) || a.name.localeCompare(b.name));
+}
+
+/* ── production report ── */
+
+export const PRODUCTION_FLOORS = ["1st", "2nd"] as const;
+export const PRODUCTION_LINES = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th"] as const;
+export const PRODUCTION_STAGES = ["Packing", "Filling", "Filling & Packing", "Molding", "Sticker pasting"] as const;
+export const PRODUCTION_SLOTS = ["1st", "2nd", "3rd", "All Shift"] as const;
+// shortcut: the line leaders are a fixed list here — move to a master table once leaders change often
+export const LINE_LEADERS = [
+  "MAMTA", "MEENA", "SANWALI", "SACHIN", "SATISH", "NAGMA", "GOLDI", "DESHRAJ", "MOHAN", "PRAHALAD", "SINKU", "SANJAY", "KUNDAN",
+  "AJAY", "PAPPU", "MEERA", "ANKIT", "DEEPU", "RINKI", "SANT PRAKASH", "ROHINI", "MUNCHUN", "ROOPA", "URMILA", "LAXMI", "KHUSBOO",
+  "RAHUL",
+] as const;
+/** Supervisors who sign an FG transfer note. */
+export const FG_SUPERVISORS = ["Atul Sharma", "Vijay Bisht", "Narender Rathi", "Shyam Sunder"] as const;
+
+/** Total FG of a report row (the three time slots) and its achievement against the row's target, in % (1 decimal). */
+export function reportRowTotals(r: { qtyFirst: number | null; qtySecond: number | null; qtyEvening: number | null; targetQty: number | null }) {
+  const total = (r.qtyFirst ?? 0) + (r.qtySecond ?? 0) + (r.qtyEvening ?? 0);
+  const achievement = r.targetQty ? Math.round((total / r.targetQty) * 1000) / 10 : null;
+  return { total, achievement };
+}
+
+/** The GRN of an open SHORT escalation, or a refusal. */
+function openShort(s: FlowState, grnNo: string): GrnLine {
+  const g = s.grnLines.find((x) => x.grnNo === grnNo);
+  if (!g) return reject(`GRN ${grnNo} not found.`);
+  if (g.variance !== "SHORT") reject(`GRN ${grnNo} is not a SHORT escalation.`);
+  if (s.escalationClosures.some((c) => c.grnNo === grnNo)) reject(`The escalation of GRN ${grnNo} is already closed.`);
+  return g;
+}
+
+export function openEscalations(s: Pick<FlowState, "grnLines" | "escalationClosures">): GrnLine[] {
+  const closed = new Set(s.escalationClosures.map((c) => c.grnNo));
+  return s.grnLines.filter((g) => g.variance !== "" && !closed.has(g.grnNo));
+}
+
+/** A GRN whose QC decision rejected some or all of it, waiting for Purchase's debit note. */
+export interface DebitNoteDue {
+  grn: GrnLine;
+  arNo: string;
+  /** Rejected quantity, in the GRN's unit. */
+  qty: number;
+  /** QC's reason (the A.R. remark). */
+  reason: string;
+}
+
+/**
+ * The QC decisions that rejected something and have no debit note yet. Only decisions that recorded the accepted
+ * quantity count (made since QC could split a lot); older rejections stay as they were.
+ */
+export function debitNotesDue(s: Pick<FlowState, "grnLines" | "qcIntimations" | "arRecords" | "debitNotes">): DebitNoteDue[] {
+  const raised = new Set(s.debitNotes.filter((d) => d.kind !== "SHORT_SUPPLY").map((d) => d.grnNo));
+  return s.grnLines.flatMap((grn): DebitNoteDue[] => {
+    if (raised.has(grn.grnNo) || grn.acceptedQty === null || (grn.qcStatus !== "APPROVED" && grn.qcStatus !== "REJECTED")) return [];
+    const qty = r3(grn.totalQty - grn.acceptedQty);
+    if (qty <= 0) return [];
+    const slips = new Set(s.qcIntimations.filter((q) => q.grnNo === grn.grnNo).map((q) => q.id));
+    const ars = s.arRecords.filter((a) => slips.has(a.intimationId));
+    const ar = ars[ars.length - 1];
+    return [{ grn, arNo: ar?.arNo ?? "", qty, reason: ar?.remark ?? "" }];
+  });
+}
+
 /* ── reducers: one per register action ──────────────────────────────────────── */
 
 type Rejected = never;
@@ -507,48 +750,16 @@ const reject = (message: string): Rejected => {
 };
 
 export const reducers = {
+  /**
+   * The gate records the vehicle and the paper it carries (supplier, invoice, quantity, driver) — no PO: Store reads
+   * the invoice and picks the PO at GRN. Time in is the server's clock; the photo is added right after (own call).
+   */
   addGateEntry(s: FlowState, e: Omit<GateEntry, "id">): FlowState {
-    let supplierName = e.supplierName;
-    let productDesc = e.productDesc;
-    let lines: GateEntryLine[] = [];
-    if (e.poNo) {
-      const progress = deriveTallyPoProgress(
-        gatePos(s).filter((p) => p.poNo === e.poNo),
-        s.gateEntries,
-        s.grnLines,
-      )[0];
-      if (s.purchaseOrders.some((p) => p.id === e.poNo && p.status !== "APPROVED") && !progress) {
-        reject(`PO ${e.poNo} is waiting for the owner's approval — material cannot come in against it yet.`);
-      }
-      if (!progress) return reject(`PO ${e.poNo} is not among the purchase orders. Search again.`);
-      if (progress.po.cancelled) reject(`PO ${e.poNo} is cancelled in Tally.`);
-      if (progress.po.closed) reject(`PO ${e.poNo} is closed — Purchase can reopen it if material is still due.`);
-      if (!progress.open) reject(`PO ${e.poNo} is already fully received.`);
-      if (e.lines.length === 0) reject("Tick at least one item that has arrived.");
-      const ticked = new Set<string>();
-      // Item name, code and unit are the PO's own — only the quantity and remark come from the gate.
-      lines = e.lines.map((l) => {
-        const item = progress.lines.find((x) => x.itemName === l.itemName);
-        if (!item) return reject(`${l.itemName} is not on PO ${e.poNo}.`);
-        if (ticked.has(item.itemName)) reject(`${item.itemName} is ticked twice.`);
-        ticked.add(item.itemName);
-        // Never more than is still pending on the PO (client's rule: no over-supply is accepted).
-        if (l.qty > item.pending) {
-          reject(`${item.itemName}: ${l.qty} ${item.unit} is more than the ${item.pending} ${item.unit} still pending on PO ${e.poNo}.`);
-        }
-        return { itemName: item.itemName, itemCode: item.itemCode, unit: item.unit, qty: l.qty, remark: l.remark };
-      });
-      // Against a PO the supplier is the PO's — never retyped at the gate.
-      supplierName = progress.po.supplierName;
-      productDesc = lines.map((l) => l.itemName).join(", ");
-    } else {
-      if (e.lines.length > 0) reject("Items can only be checked in against a PO.");
-      if (!supplierName.trim()) reject("Supplier name is required when there is no PO.");
-      if (!productDesc.trim()) reject("Product / material is required when there is no PO.");
-    }
+    if (!e.supplierName.trim()) reject("Pick the supplier.");
+    if (!e.vehicleNo.trim()) reject("Vehicle no is required.");
     const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-    if (e.invoiceNo && s.gateEntries.some((g) => same(g.invoiceNo, e.invoiceNo) && same(g.supplierName, supplierName))) {
-      reject(`Invoice ${e.invoiceNo} from ${supplierName} is already in the gate register.`);
+    if (e.invoiceNo && s.gateEntries.some((g) => same(g.invoiceNo, e.invoiceNo) && same(g.supplierName, e.supplierName))) {
+      reject(`Invoice ${e.invoiceNo} from ${e.supplierName} is already in the gate register.`);
     }
     return {
       ...s,
@@ -556,12 +767,11 @@ export const reducers = {
         ...s.gateEntries,
         {
           ...e,
-          supplierName,
-          productDesc,
-          // Against a PO the quantities are per item, in each item's own unit.
-          invoiceQty: e.poNo ? null : e.invoiceQty,
-          lines,
+          poNo: "",
+          productDesc: "",
+          lines: [],
           timeOut: "",
+          hasPhoto: false,
           id: numberFor(s, "GE", s.gateEntries.map((x) => x.id)),
         },
       ],
@@ -581,9 +791,20 @@ export const reducers = {
     };
   },
 
-  addGrnLine(s: FlowState, l: Omit<GrnLine, "grnNo" | "qcStatus" | "barcoded">): FlowState {
-    const gate = s.gateEntries.find((g) => g.id === l.gateEntryId);
-    if (!gate) return reject(`Gate entry ${l.gateEntryId} not found.`);
+  addGrnLine(
+    s: FlowState,
+    input: Omit<GrnLine, "grnNo" | "qcStatus" | "barcoded" | "poItemCode" | "pendingBefore" | "variance" | "closesItem" | "acceptedQty">,
+  ): FlowState {
+    const gate = s.gateEntries.find((g) => g.id === input.gateEntryId);
+    if (!gate) return reject(`Gate entry ${input.gateEntryId} not found.`);
+    const l: Omit<GrnLine, "grnNo" | "qcStatus" | "barcoded"> = {
+      ...input,
+      poItemCode: "",
+      pendingBefore: null,
+      variance: "",
+      closesItem: false,
+      acceptedQty: null,
+    };
     let grn = l;
     if (gate.lines.length > 0) {
       // Against a PO: one GRN per gate-checked item, in the PO's unit, never more than came in.
@@ -600,8 +821,30 @@ export const reducers = {
       grn = { ...l, unit: item.unit, poQty: poLine?.qty ?? null };
     } else if (l.gateLineNo !== null) {
       reject(`${gate.id} has no PO items — it was an arrival without PO.`);
+    } else if (!gate.poNo && l.poNo) {
+      // Store read the invoice and picked the PO and its item: counted against what is still pending on it.
+      const progress = deriveTallyPoProgress(gatePos(s).filter((p) => p.poNo === l.poNo), s.gateEntries, s.grnLines)[0];
+      if (!progress) return reject(`PO ${l.poNo} is not among the open purchase orders. Search again.`);
+      if (progress.po.cancelled) reject(`PO ${l.poNo} is cancelled in Tally.`);
+      if (progress.po.closed) reject(`PO ${l.poNo} is closed — Purchase can reopen it if material is still due.`);
+      if (!progress.open) reject(`PO ${l.poNo} is already fully received.`);
+      const item = progress.lines.find((x) => x.itemName === l.poItemName);
+      if (!item) return reject(`${l.poItemName} is not on PO ${l.poNo}.`);
+      if (item.pending <= 0) reject(`${item.itemName} on PO ${l.poNo} is already fully received.`);
+      if (item.itemCode && item.itemCode !== l.componentCode) {
+        reject(`${item.itemName} is ${item.itemCode} — the GRN must use that code.`);
+      }
+      grn = {
+        ...l,
+        unit: item.unit,
+        poQty: item.qty,
+        poItemName: item.itemName,
+        poItemCode: item.itemCode,
+        pendingBefore: item.pending,
+        ...grnVariance(item.pending, l.totalQty),
+      };
     } else {
-      grn = { ...l, unit: "" }; // arrival without PO: counted in pcs, as on the GRN sheet
+      grn = { ...l, unit: "", poQty: null, poItemName: "" }; // arrival without PO: counted in pcs, as on the GRN sheet
     }
     if (l.totalQty <= 0) reject("The counted quantity must be more than zero.");
     return {
@@ -624,6 +867,8 @@ export const reducers = {
     const qty = Math.max(0, isPcs(g.unit) ? Math.round(totalQty) : r3(totalQty));
     const item = g.gateLineNo === null ? undefined : s.gateEntries.find((x) => x.id === g.gateEntryId)?.lines[g.gateLineNo - 1];
     if (item && qty > item.qty) reject(`${item.itemName}: ${qty} ${item.unit} is more than the ${item.qty} ${item.unit} checked in at the gate.`);
+    // a GRN against a PO item is judged again against what was pending before it (±20%)
+    const judged = g.pendingBefore === null ? {} : grnVariance(g.pendingBefore, qty);
     // The count can be corrected only until the GRN goes to QC: from then on QC tests
     // exactly what the slip says, and nothing upstream of a passed stage may change.
     if (s.qcIntimations.some((q) => q.grnNo === grnNo) || g.qcStatus !== "UNDER_TEST") {
@@ -631,7 +876,7 @@ export const reducers = {
     }
     return {
       ...s,
-      grnLines: s.grnLines.map((x) => (x.grnNo === grnNo ? { ...x, totalQty: qty } : x)),
+      grnLines: s.grnLines.map((x) => (x.grnNo === grnNo ? { ...x, totalQty: qty, ...judged } : x)),
       qcIntimations: s.qcIntimations.map((q) => (q.grnNo === grnNo ? { ...q, totalQty: qty } : q)),
     };
   },
@@ -668,20 +913,37 @@ export const reducers = {
     };
   },
 
+  /**
+   * QC's decision on a slip. Approve takes the accepted quantity (default: all); what is not accepted is rejected
+   * and waits for Purchase's debit note — a reason is then required. Reject is the whole lot. Hold comes back to QC.
+   */
   recordAr(
     s: FlowState,
     intimationId: string,
     status: Exclude<QcStatus, "UNDER_TEST">,
     remark: string,
+    acceptedQty: number | null = null,
   ): FlowState {
     const qci = s.qcIntimations.find((x) => x.id === intimationId);
     if (!qci) return reject(`QC intimation ${intimationId} not found.`);
-    const current = s.grnLines.find((g) => g.grnNo === qci.grnNo)?.qcStatus;
+    const grn = s.grnLines.find((g) => g.grnNo === qci.grnNo);
+    const current = grn?.qcStatus;
     if (current === "APPROVED" || current === "REJECTED") {
       reject(`${qci.grnNo} already has a final QC decision (${current}).`);
     }
     // A held item is re-tested once more and then decided — it cannot be held again.
     if (current === "HOLD" && status === "HOLD") reject(`${qci.grnNo} is already on hold — approve or reject it.`);
+    const total = qci.totalQty;
+    let accepted: number | null = null;
+    if (status === "APPROVED") {
+      accepted = acceptedQty ?? total;
+      if (accepted <= 0) reject("Accepted quantity must be more than zero — reject the lot instead.");
+      if (accepted > total) reject(`Accepted ${accepted} is more than the ${total} on the slip.`);
+      if (grn && isPcs(grn.unit) && !Number.isInteger(accepted)) reject("Accepted quantity must be whole pieces.");
+      if (accepted < total && !remark.trim()) reject(`Say why ${r3(total - accepted)} are rejected — it goes on the debit note.`);
+    } else if (status === "REJECTED") {
+      accepted = 0;
+    }
     return {
       ...s,
       // History is kept: a re-test APPENDS a new A.R. record.
@@ -693,9 +955,114 @@ export const reducers = {
           date: todayLabel(),
           status,
           remark,
+          acceptedQty: accepted,
         },
       ],
-      grnLines: s.grnLines.map((g) => (g.grnNo === qci.grnNo ? { ...g, qcStatus: status } : g)),
+      grnLines: s.grnLines.map((g) => (g.grnNo === qci.grnNo ? { ...g, qcStatus: status, acceptedQty: accepted } : g)),
+    };
+  },
+
+  /** Closes an escalation (a SHORT / EXCESS GRN) with what was decided — once, signed and dated by the server. */
+  closeEscalation(s: FlowState, grnNo: string, resolution: string, date: string, by: string): FlowState {
+    const g = s.grnLines.find((x) => x.grnNo === grnNo);
+    if (!g) return reject(`GRN ${grnNo} not found.`);
+    if (!g.variance) reject(`GRN ${grnNo} is within the tolerance — there is no escalation to close.`);
+    if (s.escalationClosures.some((c) => c.grnNo === grnNo)) reject(`The escalation of GRN ${grnNo} is already closed.`);
+    if (!resolution.trim()) reject("Say how it was resolved.");
+    return { ...s, escalationClosures: [...s.escalationClosures, { grnNo, date, by, resolution: resolution.trim() }] };
+  },
+
+  /** SHORT escalation settled by a debit note: the vendor billed more than came. Note and closure in one step. */
+  escalationDebitNote(
+    s: FlowState,
+    d: { grnNo: string; qty: number; rate: number; reason: string; date: string; raisedBy: string },
+  ): FlowState {
+    const g = openShort(s, d.grnNo);
+    if (!(d.qty > 0)) reject("Enter the short qty to debit.");
+    if (!(d.rate > 0)) reject("Enter the rate (₹ per unit).");
+    if (!d.reason.trim()) reject("Say why — the reason goes to the vendor.");
+    const id = numberFor(s, "DN", s.debitNotes.map((x) => x.id));
+    const note: DebitNote = {
+      id,
+      kind: "SHORT_SUPPLY",
+      date: d.date,
+      grnNo: g.grnNo,
+      arNo: "",
+      supplierName: g.supplierName,
+      invoiceNo: g.invoiceNo,
+      poNo: g.poNo,
+      componentCode: g.componentCode,
+      componentName: g.componentName,
+      qty: d.qty,
+      unit: g.unit,
+      rate: d.rate,
+      amount: Math.round(d.qty * d.rate * 100) / 100,
+      reason: d.reason.trim(),
+      raisedBy: d.raisedBy,
+    };
+    const resolution = `Debit note ${id}: ${d.qty.toLocaleString("en-IN")} ${g.unit} short × ₹${d.rate} — ${d.reason.trim()}`.slice(0, 500);
+    return {
+      ...s,
+      debitNotes: [...s.debitNotes, note],
+      escalationClosures: [...s.escalationClosures, { grnNo: g.grnNo, date: d.date, by: d.raisedBy, resolution }],
+    };
+  },
+
+  /** SHORT escalation settled by buying the balance: an open indent (→ a new PO), and the escalation closed. */
+  escalationIndent(s: FlowState, d: { grnNo: string; qty: number; rate: number; reason: string; date: string; by: string }): FlowState {
+    const g = openShort(s, d.grnNo);
+    if (!(d.qty > 0)) reject("Enter the balance qty to buy.");
+    if (!(d.rate > 0)) reject("Enter the rate (₹ per unit).");
+    if (!g.supplierName) reject(`GRN ${g.grnNo} has no supplier to indent from.`);
+    const id = numberFor(s, "IND", s.indents.map((x) => x.id));
+    const reason = `Balance of short GRN ${g.grnNo}${d.reason.trim() ? ` — ${d.reason.trim()}` : ""}`.slice(0, 200);
+    return {
+      ...s,
+      indents: [
+        ...s.indents,
+        { id, date: d.date, componentCode: g.componentCode, componentName: g.componentName, qty: d.qty, reason, supplierName: g.supplierName, rate: d.rate, status: "OPEN" as const },
+      ],
+      escalationClosures: [
+        ...s.escalationClosures,
+        { grnNo: g.grnNo, date: d.date, by: d.by, resolution: `Indent ${id} raised for the balance ${d.qty.toLocaleString("en-IN")} ${g.unit} (new PO)${d.reason.trim() ? ` — ${d.reason.trim()}` : ""}`.slice(0, 500) },
+      ],
+    };
+  },
+
+  /** Purchase raises the debit note for what QC rejected on one GRN: rejected qty × rate. Once per GRN, final. */
+  addDebitNote(
+    s: FlowState,
+    d: { grnNo: string; rate: number; reason: string; date: string; raisedBy: string },
+  ): FlowState {
+    const due = debitNotesDue(s).find((x) => x.grn.grnNo === d.grnNo);
+    if (s.debitNotes.some((n) => n.grnNo === d.grnNo && n.kind !== "SHORT_SUPPLY")) reject(`GRN ${d.grnNo} already has its debit note.`);
+    if (!due) return reject(`GRN ${d.grnNo} has nothing rejected by QC to debit.`);
+    if (!(d.rate > 0)) reject("Enter the rate (₹ per unit).");
+    if (!d.reason.trim()) reject("Say why — the reason goes to the vendor.");
+    const g = due.grn;
+    return {
+      ...s,
+      debitNotes: [
+        ...s.debitNotes,
+        {
+          id: numberFor(s, "DN", s.debitNotes.map((x) => x.id)),
+          kind: "QC_REJECTED" as const,
+          date: d.date,
+          grnNo: g.grnNo,
+          arNo: due.arNo,
+          supplierName: g.supplierName,
+          invoiceNo: g.invoiceNo,
+          poNo: g.poNo,
+          componentCode: g.componentCode,
+          componentName: g.componentName,
+          qty: due.qty,
+          unit: g.unit,
+          rate: d.rate,
+          amount: Math.round(due.qty * d.rate * 100) / 100,
+          reason: d.reason.trim(),
+          raisedBy: d.raisedBy,
+        },
+      ],
     };
   },
 
@@ -728,7 +1095,7 @@ export const reducers = {
     if (!req) return reject(`Requisition ${id} not found.`);
     if (req.status === "ISSUED") reject(`Requisition ${id} is already issued.`);
     // Guard: never issue more than the closing stock at this moment.
-    const stock = derivePmStock(s.grnLines, s.requisitions, s.mrns, s.openings, s.minLevels);
+    const stock = derivePmStock(s.grnLines, s.requisitions, s.mrns, s.openings, s.minLevels, [], s.bomIssues);
     const available = new Map<string, number>();
     const clamped = req.lines.map((l, i) => {
       const avail =
@@ -898,6 +1265,7 @@ export const reducers = {
   },
 
   addIndent(s: FlowState, i: Omit<Indent, "id" | "status">): FlowState {
+    if (i.requestNo && s.indents.some((x) => x.requestNo === i.requestNo)) reject(`Indent request ${i.requestNo} already has an indent.`);
     return {
       ...s,
       indents: [
@@ -909,6 +1277,7 @@ export const reducers = {
 
   raisePo(s: FlowState, p: Omit<PurchaseOrder, "id" | "status" | "approvedBy" | "tallyPushedAt" | "tallyError">): FlowState {
     if (p.indentIds.length === 0) reject("Tick at least one indent for the PO.");
+    if (p.gst !== "INTRA" && p.gst !== "INTER") reject("Choose GST: same state (CGST + SGST) or other state (IGST).");
     // One PO gathers open indents of ONE vendor; each item is one PO line.
     const inds = p.indentIds.map((id) => {
       const ind = s.indents.find((i) => i.id === id);
@@ -989,10 +1358,26 @@ export const reducers = {
     return { ...s, poClosures: next };
   },
 
+  /** The owner turns a PO down: it never goes out, and its indents are open again for a new PO. */
+  rejectPo(s: FlowState, poId: string, reason: string, by: string): FlowState {
+    const po = s.purchaseOrders.find((p) => p.id === poId);
+    if (!po) return reject(`PO ${poId} not found.`);
+    if (po.status !== "PENDING_APPROVAL") reject(`PO ${poId} is already ${po.status === "APPROVED" ? "approved" : "rejected"}.`);
+    if (!reason.trim()) reject("Say why the PO is rejected.");
+    return {
+      ...s,
+      purchaseOrders: s.purchaseOrders.map((p) =>
+        p.id === poId ? { ...p, status: "REJECTED" as const, rejectedBy: by, rejectReason: reason.trim(), indentIds: [] } : p,
+      ),
+      indents: s.indents.map((i) => (po.indentIds.includes(i.id) ? { ...i, status: "OPEN" as const } : i)),
+    };
+  },
+
   approvePo(s: FlowState, poId: string, approvedBy: string): FlowState {
     const po = s.purchaseOrders.find((p) => p.id === poId);
     if (!po) return reject(`PO ${poId} not found.`);
     if (po.status === "APPROVED") reject(`PO ${poId} is already approved.`);
+    if (po.status === "REJECTED") reject(`PO ${poId} was rejected.`);
     return {
       ...s,
       purchaseOrders: s.purchaseOrders.map((p) =>
@@ -1005,9 +1390,26 @@ export const reducers = {
 export type Reducers = typeof reducers;
 export type ActionName = keyof Reducers;
 /** The input of an action — the reducer's parameters after the state. */
-export type ActionArgs<K extends ActionName> = Reducers[K] extends (s: FlowState, ...args: infer A) => FlowState
-  ? A
-  : never;
+/** What the gate types for a vehicle; the server adds the number, date, time in and the rest. */
+export type GateEntryInput = Pick<
+  GateEntry,
+  "supplierName" | "invoiceNo" | "invoiceDate" | "invoiceQty" | "invoiceQtyUnit" | "transportName" | "lrNo" | "vehicleNo" | "driverName" | "driverPhone"
+>;
+
+/** Actions whose screen sends less than the reducer receives (the server's prepare step fills the rest). */
+interface ScreenArgs {
+  addGateEntry: [GateEntryInput];
+  addDebitNote: [{ grnNo: string; rate: number; reason: string }];
+  escalationDebitNote: [{ grnNo: string; qty: number; rate: number; reason: string }];
+  escalationIndent: [{ grnNo: string; qty: number; rate: number; reason: string }];
+}
+
+/** The arguments a screen sends for an action. */
+export type ActionArgs<K extends ActionName> = K extends keyof ScreenArgs
+  ? ScreenArgs[K]
+  : Reducers[K] extends (s: FlowState, ...args: infer A) => FlowState
+    ? A
+    : never;
 
 /* ── traceability ───────────────────────────────────────────────────────────── */
 
@@ -1105,7 +1507,7 @@ export function traceGrn(state: FlowState, grnNo: string): TraceEvent[] {
             title: "Component issued to packing",
             detail: `${l.qtyIssued.toLocaleString("en-IN")} pcs · dept ${req.department} (issues draw on all approved lots)`,
             date: req.date,
-            tab: "requisition",
+            tab: "production",
           });
         }
       }
@@ -1125,7 +1527,7 @@ export function traceBatch(state: FlowState, batchNo: string): TraceEvent[] {
       title: "Requisition slip",
       detail: `${req.lines.length} materials · dept ${req.department}`,
       date: req.date,
-      tab: "requisition",
+      tab: "production",
     });
     if (req.status === "ISSUED") {
       out.push({
@@ -1137,7 +1539,7 @@ export function traceBatch(state: FlowState, batchNo: string): TraceEvent[] {
           .map((l) => `${l.materialCode} × ${(l.qtyIssued ?? 0).toLocaleString("en-IN")}`)
           .join(" · "),
         date: req.date,
-        tab: "requisition",
+        tab: "production",
       });
     }
     for (const m of state.mrns.filter((x) => x.requisitionId === req.id)) {
@@ -1148,7 +1550,7 @@ export function traceBatch(state: FlowState, batchNo: string): TraceEvent[] {
         title: "Material returned (MRN)",
         detail: m.lines.map((l) => `${l.componentCode} × ${l.qty.toLocaleString("en-IN")}`).join(" · "),
         date: m.date,
-        tab: "requisition",
+        tab: "production",
       });
     }
   }

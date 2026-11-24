@@ -2,7 +2,7 @@
  * The demo storyline — loaded into the database only by `npm run db:demo` or the
  * admin's protected "Load demo data". Never shipped to the browser.
  */
-import type { FlowState } from "../../src/flow/types";
+import type { ArRecord, FlowState, GateEntry, GrnLine } from "../../src/flow/types";
 import { MIN_LEVELS, SEED_OPENINGS } from "./masterData";
 
 /**
@@ -12,11 +12,18 @@ import { MIN_LEVELS, SEED_OPENINGS } from "./masterData";
  * and a continuing storyline so that batch LL112-B01 can be traced end to end:
  * gate → GRN → QC → issue → packing → FG transfer → FG stock → dispatch → gate out.
  */
+/** The demo's gate entries are from before the gate became manual: no photo or driver recorded. */
+const withGateDefaults = (xs: Omit<GateEntry, "invoiceQtyUnit" | "driverName" | "driverPhone" | "hasPhoto">[]): GateEntry[] =>
+  xs.map((g) => ({ ...g, invoiceQtyUnit: "", driverName: "", driverPhone: "", hasPhoto: false }));
+/** …and so are its GRNs: their PO comes from the gate entry, no ±20% judgement. */
+const withGrnDefaults = (xs: Omit<GrnLine, "poItemName" | "poItemCode" | "pendingBefore" | "variance" | "closesItem" | "acceptedQty">[]): GrnLine[] =>
+  xs.map((g) => ({ ...g, poItemName: "", poItemCode: "", pendingBefore: null, variance: "", closesItem: false, acceptedQty: null }));
+
 export function seedState(): FlowState {
   return {
     openings: { ...SEED_OPENINGS },
     minLevels: { ...MIN_LEVELS },
-    gateEntries: [
+    gateEntries: withGateDefaults([
       {
         id: "GE-0001",
         date: "08-01-2026",
@@ -128,9 +135,9 @@ export function seedState(): FlowState {
           { itemName: "6ML EYELINER cap", itemCode: "PMS0843", unit: "Pcs", qty: 6000, remark: "4000 Pcs short — balance next week" },
         ],
       },
-    ],
+    ]),
 
-    grnLines: [
+    grnLines: withGrnDefaults([
       // The three rows exactly as on the client's GRN sheet.
       {
         grnNo: "GR0001",
@@ -312,7 +319,7 @@ export function seedState(): FlowState {
         qcStatus: "UNDER_TEST",
         barcoded: false,
       },
-    ],
+    ]),
 
     qcIntimations: [
       {
@@ -413,14 +420,15 @@ export function seedState(): FlowState {
       },
     ],
 
-    arRecords: [
+    // decided before QC could split a lot: all or nothing (no accepted qty)
+    arRecords: ([
       { arNo: "AR-0001", intimationId: "QCI-0001", date: "08-01-2026", status: "APPROVED", remark: "" },
       { arNo: "AR-0002", intimationId: "QCI-0002", date: "08-01-2026", status: "APPROVED", remark: "" },
       { arNo: "AR-0003", intimationId: "QCI-0003", date: "09-01-2026", status: "HOLD", remark: "Awaiting supplier confirmation of qty" },
       { arNo: "AR-0004", intimationId: "QCI-0004", date: "10-08-2026", status: "APPROVED", remark: "" },
       { arNo: "AR-0005", intimationId: "QCI-0005", date: "10-08-2026", status: "APPROVED", remark: "" },
       { arNo: "AR-0006", intimationId: "QCI-0006", date: "10-08-2026", status: "REJECTED", remark: "Seal integrity failed — transit damage" },
-    ],
+    ] as Omit<ArRecord, "acceptedQty">[]).map((a) => ({ ...a, acceptedQty: null })),
 
     requisitions: [
       // The client's own slip: 10-Aug-2026, dept LL, 1st floor, 1,440 pcs each.
@@ -732,6 +740,9 @@ export function seedState(): FlowState {
     ],
 
     poClosures: [],
+    debitNotes: [],
+    escalationClosures: [],
+    bomIssues: [],
     tallyPos: [
       {
         poNo: "26SEV301",

@@ -17,7 +17,7 @@ async function withBasis(path, body, headers) {
 
 function client() {
   let cookie = "";
-  return async function call(method, path, body, headers = { "x-flow-request": "1" }) {
+  const call = async (method, path, body, headers = { "x-flow-request": "1" }) => {
     const res = await fetch(BASE + path, {
       method,
       headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}), ...headers },
@@ -28,6 +28,8 @@ function client() {
     try { json = await res.json(); } catch {}
     return { status: res.status, json, headers: res.headers };
   };
+  call.cookie = () => cookie;
+  return call;
 }
 
 async function login(u, p) {
@@ -62,7 +64,7 @@ console.log("role restrictions");
 const { c: gate } = await login("gate", "seven@gate");
 const gs = (await gate("GET", "/api/state")).json.state;
 check("gate gets no dispatch/orders/QC", gs.dispatchSlips.length === 0 && gs.orders.length === 0 && gs.qcIntimations.length === 0);
-check("gate gets Tally POs and app POs, never their rates", gs.tallyPos.length > 0 && gs.purchaseOrders.length > 0 && gs.purchaseOrders.every((p) => p.lines.every((l) => l.rate === null)) && !JSON.stringify(gs.tallyPos).includes("rate"));
+check("gate gets no POs at all (it records vehicles; Store picks the PO)", gs.tallyPos.length === 0 && gs.purchaseOrders.length === 0);
 check("gate cannot read supplier rates", (await gate("GET", "/api/masters/suppliers")).status === 403);
 const deny = await gate("POST", "/api/actions/recordAr", { args: ["QCI-0001", "APPROVED", ""] });
 check("gate cannot make QC decision (403)", deny.status === 403);
@@ -78,19 +80,21 @@ check("purchase cannot approve own PO", (await purchase("POST", "/api/actions/ap
 check("demo reset admin-only", (await purchase("POST", "/api/demo/clear")).status === 403);
 
 console.log("actions + rules");
-const ge = await gate("POST", "/api/actions/addGateEntry", { args: [{ date: "01-01-1999", supplierName: "Test Supplier", productDesc: "x", invoiceNo: "INV1", invoiceDate: "", poNo: "", invoiceQty: 10, transportName: "", lrNo: "LR1", vehicleNo: "HR-1", timeIn: "00:00", timeOut: "", driverSign: false, remark: "", lines: [] }] });
+const gateIn = (over) => gate("POST", "/api/actions/addGateEntry", { args: [{ supplierName: "Shree Packwell", invoiceNo: "", invoiceDate: "", invoiceQty: 10, invoiceQtyUnit: "Box", transportName: "", lrNo: "LR1", vehicleNo: "HR-1", driverName: "", driverPhone: "", ...over }] });
+const ge = await gateIn({ invoiceNo: `INV1-${Date.now()}` });
 const newGe = ge.json?.changes?.gateEntries?.at(-1);
-check("gate entry created", ge.status === 200 && newGe?.supplierName === "Test Supplier");
-check("server stamps date (client backdate ignored)", newGe?.date !== "01-01-1999", newGe?.date);
-const badIn = await gate("POST", "/api/actions/addGateEntry", { args: [{ date: "", supplierName: "", productDesc: "", invoiceNo: "", invoiceDate: "", poNo: "", invoiceQty: null, transportName: "", lrNo: "", vehicleNo: "", timeIn: "", timeOut: "", driverSign: false, remark: "", lines: [] }] });
+check("gate entry created", ge.status === 200 && newGe?.supplierName === "Shree Packwell");
+check("the server dates it (the client cannot send a date)", /^\d{2}-\d{2}-\d{4}$/.test(newGe?.date) && (await gateIn({ date: "01-01-1999" })).status === 400, newGe?.date);
+const badIn = await gateIn({ supplierName: "" });
 check("validation: empty supplier refused", badIn.status === 400, JSON.stringify(badIn.json));
-const inj = await gate("POST", "/api/actions/addGateEntry", { args: [{ date: "", supplierName: "x', 'y'); DROP TABLE users; --", productDesc: "<script>alert(1)</script>", invoiceNo: "", invoiceDate: "", poNo: "", invoiceQty: null, transportName: "", lrNo: "", vehicleNo: "HR55-T-0001", timeIn: "00:00", timeOut: "", driverSign: false, remark: "", lines: [] }] });
-check("SQL-ish text stored as plain data", inj.status === 200 && inj.json.changes.gateEntries.at(-1).supplierName.includes("DROP TABLE"));
+check("a supplier not on file is refused", (await gateIn({ supplierName: "x', 'y'); DROP TABLE users; --" })).status === 409);
+const inj = await gateIn({ driverName: "x', 'y'); DROP TABLE users; --", transportName: "<script>alert(1)</script>" });
+check("SQL-ish text stored as plain data", inj.status === 200 && inj.json.changes.gateEntries.at(-1).driverName.includes("DROP TABLE"));
 
 const { c: store } = await login("store", "seven@store");
 const s0 = (await store("GET", "/api/state")).json.state;
 const geId = s0.gateEntries.at(-1).id;
-const grn = await store("POST", "/api/actions/addGrnLine", { args: [{ gateEntryId: geId, gateLineNo: null, unit: "", componentCode: "PMS0014", componentName: "HACKED", type: "x", brandName: "SEVEN SEAS", receivedDate: "", poNo: "", poQty: null, invoiceNo: "", supplierName: "Someone else", qtyPerBox: 100, totalBoxes: 24, totalQty: 999999, remarkStore: "", location: "Store" }] });
+const grn = await store("POST", "/api/actions/addGrnLine", { args: [{ gateEntryId: geId, gateLineNo: null, unit: "", componentCode: "PMS0014", componentName: "HACKED", type: "x", brandName: "SEVEN SEAS", receivedDate: "", poNo: "", poItemName: "", poQty: null, invoiceNo: "", supplierName: "Someone else", qtyPerBox: 100, totalBoxes: 24, totalQty: 999999, remarkStore: "", location: "Store" }] });
 const g = grn.json?.changes?.grnLines?.at(-1);
 check("GRN created UNDER_TEST", grn.status === 200 && g?.qcStatus === "UNDER_TEST");
 check("GRN name/supplier/total from server", g?.componentName !== "HACKED" && g?.totalQty === 2400, JSON.stringify(g));
@@ -114,6 +118,90 @@ if (open) {
 }
 
 console.log("logout");
+console.log("hardening (pentest findings)");
+{
+  const raw = async (p) => fetch(BASE + p);
+  const page = await raw("/");
+  check("only / serves the app page", page.status === 200);
+  for (const p of ["/anything", "/.env", "/server/src/config.ts", "/package.json", "/admin"]) {
+    const r = await raw(p);
+    check(`  ${p} → plain 404 (not the page)`, r.status === 404 && !(r.headers.get("content-type") ?? "").includes("html"));
+  }
+  const nope = await gate("POST", "/api/demo/<script>", { password: "x", confirm: "x" });
+  check("an unknown demo operation is refused before it reaches the audit log", nope.status === 404);
+  const future = await gate("POST", "/api/actions/recordVehicleOut", { args: [geId, true, ""], basis: 9e15 });
+  check("a screen cannot claim a future version to skip the stale-screen guard", future.status === 409, JSON.stringify(future.json));
+  const gs2 = (await gate("GET", "/api/state")).json.state;
+  check("the gate gets only which entries have a GRN — every detail blank",
+    gs2.grnLines.length > 0 && gs2.grnLines.every((g) => g.totalQty === 0 && !g.poNo && !g.supplierName && !g.componentCode && g.acceptedQty === null));
+  // the gate's screen computes stock and PO figures from what it receives: it must not crash on the blanked GRNs
+  const { tsImport } = await import("tsx/esm/api");
+  const L = await tsImport("../../src/flow/logic.ts", import.meta.url);
+  let crash = "";
+  try {
+    L.derivePmStock(gs2.grnLines, gs2.requisitions, gs2.mrns, gs2.openings, gs2.minLevels);
+    L.derivePoProgress(gs2.purchaseOrders, gs2.gateEntries, gs2.grnLines);
+    L.awaitingGrn(gs2.gateEntries, gs2.grnLines);
+  } catch (e) {
+    crash = String(e);
+  }
+  check("…and the gate's screen code runs on it without crashing (it went blank before)", crash === "", crash);
+  const ss = (await store("GET", "/api/state")).json.state;
+  check("Store does not get drivers' names or phones", ss.gateEntries.every((g) => !g.driverPhone && !g.driverName));
+  check("…nor Tally errors or rates on POs", ss.purchaseOrders.every((p) => !p.tallyError && p.lines.every((l) => l.rate === null)));
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(500, 7)]);
+  const { c: gate2 } = await login("gate", "seven@gate");
+  const photoOld = await fetch(`${BASE}/api/gate-entries/GE-0001/photo`, {
+    method: "POST",
+    headers: { "content-type": "image/jpeg", "x-flow-request": "1", cookie: gate2.cookie() },
+    body: jpeg,
+  });
+  const why = await photoOld.json().catch(() => ({}));
+  check("a photo cannot be attached to someone else's / an old gate entry", photoOld.status === 409 && /Only the login that made/.test(why.error ?? ""), JSON.stringify(why));
+  const req = (await store("GET", "/api/state")).json.state.requisitions.find((r) => r.status === "PENDING");
+  if (req) {
+    const issued = await store("POST", "/api/actions/issueRequisition", { args: [req.id, req.lines.map(() => 0), "The Owner"] });
+    const signedAs = issued.json?.changes?.requisitions?.find((r) => r.id === req.id)?.storeSign;
+    check("a signature is the logged-in user, never the name the screen sends", issued.status !== 200 || (signedAs && signedAs !== "The Owner"), JSON.stringify(signedAs));
+  }
+}
+
+console.log("users tab");
+{
+  check("only admin lists users", (await gate("GET", "/api/users")).status === 403);
+  check("only admin adds users", (await gate("POST", "/api/users", { username: "x_gate_2", role: "gate", label: "Gate", name: "X", password: "Start#Pass2026" })).status === 403);
+  check("taken username says taken", (await admin("GET", "/api/users/check?username=gate")).json?.taken === true);
+  const fresh = `t_${Date.now() % 1e9}`;
+  check("free username says available", (await admin("GET", `/api/users/check?username=${fresh}`)).json?.taken === false);
+  check("bad username refused", (await admin("GET", "/api/users/check?username=A%20B")).status === 400);
+  check("name is required", (await admin("POST", "/api/users", { username: fresh, role: "gate", label: "Gate Entry", name: "", password: "Start#Pass2026" })).status === 400);
+  const weak = await admin("POST", "/api/users", { username: fresh, role: "gate", label: "Gate Entry", name: "Test Guard", password: "seven@gate" });
+  check("a weak starting password is refused with the reason", weak.status === 400 && /characters|default|guess|Mix/.test(weak.json?.error ?? ""), JSON.stringify(weak.json));
+  const made = await admin("POST", "/api/users", { username: fresh, role: "gate", label: "Gate Entry", name: "Test Guard", password: "Start#Pass2026" });
+  check("admin adds a user with the password they typed; it is not sent back", made.status === 200 && made.json.username === fresh && !("password" in made.json));
+  check("same username again is refused", (await admin("POST", "/api/users", { username: fresh, role: "store", label: "Store", name: "Other", password: "Start#Pass2026" })).status === 409);
+  const listed = (await admin("GET", "/api/users")).json.users.find((u) => u.username === fresh);
+  check("listed with name, label and role; no password", listed?.name === "Test Guard" && listed.label === "Gate Entry" && listed.role === "gate" && !("password" in listed));
+  const { c: newbie, r: first } = await login(fresh, "Start#Pass2026");
+  check("new user must set their own password first", first.status === 200 && first.json.user.mustChangePassword === true && first.json.user.name === "Test Guard");
+  check("only admin can disable", (await gate("POST", `/api/users/${fresh}/active`, { active: false })).status === 403);
+  check("admin cannot disable themselves", (await admin("POST", "/api/users/admin/active", { active: false })).status === 409);
+  check("admin disables a user", (await admin("POST", `/api/users/${fresh}/active`, { active: false })).status === 200);
+  check("…who is signed out at once", (await newbie("GET", "/api/auth/me")).status === 401);
+  check("…and cannot log in", (await login(fresh, "Start#Pass2026")).r.status === 401);
+  check("…listed as disabled", (await admin("GET", "/api/users")).json.users.find((u) => u.username === fresh)?.active === false);
+  check("admin enables them again", (await admin("POST", `/api/users/${fresh}/active`, { active: true })).status === 200);
+  check("…and they can log in again", (await login(fresh, "Start#Pass2026")).r.status === 200);
+  check("only admin changes a role", (await gate("POST", `/api/users/${fresh}/role`, { role: "store", label: "Store" })).status === 403);
+  check("admin cannot change their own role", (await admin("POST", "/api/users/admin/role", { role: "store", label: "Store" })).status === 409);
+  check("an unknown role is refused", (await admin("POST", `/api/users/${fresh}/role`, { role: "boss", label: "Boss" })).status === 400);
+  const { c: before } = await login(fresh, "Start#Pass2026");
+  check("admin changes gate → store", (await admin("POST", `/api/users/${fresh}/role`, { role: "store", label: "Store" })).status === 200);
+  check("…the user is signed out", (await before("GET", "/api/auth/me")).status === 401);
+  const relog = (await login(fresh, "Start#Pass2026")).r;
+  check("…and logs in with the new role and label", relog.json?.user?.role === "store" && relog.json.user.label === "Store", JSON.stringify(relog.json?.user));
+}
+
 await gate("POST", "/api/auth/logout");
 check("session gone after logout", (await gate("GET", "/api/state")).status === 401);
 

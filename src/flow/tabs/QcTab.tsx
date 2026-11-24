@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../auth";
 import { useFlow } from "../store";
-import { Card, Chip, EmptyNote, StatusChip, Table, Td, Tr, fmt, fmtQty } from "../ui";
+import { Card, Chip, EmptyNote, Pager, StatusChip, Table, Td, Tr, fmt, fmtQty, usePaged } from "../ui";
 import type { QcStatus } from "../types";
 
 export function QcTab() {
@@ -9,8 +9,13 @@ export function QcTab() {
   const unitOf = new Map(state.grnLines.map((g) => [g.grnNo, g.unit]));
   const { can } = useAuth();
   const [remarks, setRemarks] = useState<Record<string, string>>({});
+  /** Accepted quantity typed per slip ("" = the whole lot). */
+  const [accepted, setAccepted] = useState<Record<string, string>>({});
 
   const decided = new Map(state.arRecords.map((a) => [a.intimationId, a]));
+  // the two registers show 10 rows a page, newest first
+  const slips = usePaged(state.qcIntimations.slice().reverse());
+  const ars = usePaged(state.arRecords.slice().reverse());
 
   const pending = state.qcIntimations.filter((q) => {
     const ar = decided.get(q.id);
@@ -21,7 +26,12 @@ export function QcTab() {
   const pdiQueue = fgStock.filter((r) => r.inStock > 0 && r.pdi !== "PASSED");
 
   async function decide(qciId: string, status: Exclude<QcStatus, "UNDER_TEST">) {
-    if (await recordAr(qciId, status, remarks[qciId] ?? "")) setRemarks((r) => ({ ...r, [qciId]: "" }));
+    const typed = accepted[qciId] ?? "";
+    const qty = status === "APPROVED" && typed !== "" ? Number(typed) : null;
+    if (await recordAr(qciId, status, remarks[qciId] ?? "", qty)) {
+      setRemarks((r) => ({ ...r, [qciId]: "" }));
+      setAccepted((a) => ({ ...a, [qciId]: "" }));
+    }
   }
 
   const mayDecide = can("qc.decide");
@@ -41,11 +51,17 @@ export function QcTab() {
               "Product name",
               { label: "Qty", align: "right" },
               "Current",
-              ...(mayDecide ? ["QC remark", "Decision"] : []),
+              ...(mayDecide ? [{ label: "Accepted qty", align: "right" as const }, "QC remark", "Decision"] : []),
             ]}
           >
             {pending.map((q, i) => {
               const ar = decided.get(q.id);
+              const unit = unitOf.get(q.grnNo) ?? "";
+              const typed = accepted[q.id] ?? "";
+              const take = typed === "" ? q.totalQty : Number(typed);
+              const rejecting = Math.round((q.totalQty - take) * 1000) / 1000;
+              const badQty = typed !== "" && !(take > 0 && take <= q.totalQty);
+              const needReason = rejecting > 0 && !(remarks[q.id] ?? "").trim();
               return (
                 <Tr key={q.id} zebra={i % 2 === 1}>
                   <Td num strong>{q.id}</Td>
@@ -55,12 +71,32 @@ export function QcTab() {
                   <Td>{ar ? <StatusChip status="HOLD" /> : <StatusChip status="UNDER_TEST" />}</Td>
                   {mayDecide && (
                     <>
+                      <Td right>
+                        <input
+                          className="field num h-7 w-28 text-right"
+                          inputMode="decimal"
+                          value={typed}
+                          onChange={(e) => setAccepted((a) => ({ ...a, [q.id]: e.target.value.replace(/[^\d.]/g, "") }))}
+                          placeholder={`all ${fmtQty(q.totalQty, unit)}`}
+                          aria-label={`Accepted quantity of ${q.id}`}
+                        />
+                        {rejecting > 0 && !badQty && (
+                          <span className="mt-0.5 block text-[10.5px] font-semibold" style={{ color: "var(--red)" }}>
+                            {fmtQty(rejecting, unit)} rejected → debit note
+                          </span>
+                        )}
+                        {badQty && (
+                          <span className="mt-0.5 block text-[10.5px] font-semibold" style={{ color: "var(--red)" }}>
+                            1 to {fmtQty(q.totalQty, unit)}
+                          </span>
+                        )}
+                      </Td>
                       <Td>
                         <input
                           className="field h-7 w-[220px] text-[12px]"
                           value={remarks[q.id] ?? ""}
                           onChange={(e) => setRemarks((r) => ({ ...r, [q.id]: e.target.value }))}
-                          placeholder="Remark (optional)"
+                          placeholder={rejecting > 0 ? "Why rejected? (goes on the debit note)" : "Remark (optional)"}
                           aria-label={`QC remark for ${q.id}`}
                         />
                       </Td>
@@ -70,8 +106,10 @@ export function QcTab() {
                             className="btn h-7 px-2 text-[11px]"
                             style={{ borderColor: "var(--green)", color: "var(--green)" }}
                             onClick={() => decide(q.id, "APPROVED")}
+                            disabled={badQty || needReason}
+                            title={needReason ? "Say why the rest is rejected" : undefined}
                           >
-                            Approve
+                            {rejecting > 0 && !badQty ? `Approve ${fmtQty(take, unit)}` : "Approve all"}
                           </button>
                           {!ar && (
                             <button
@@ -87,7 +125,7 @@ export function QcTab() {
                             style={{ borderColor: "var(--red)", color: "var(--red)" }}
                             onClick={() => decide(q.id, "REJECTED")}
                           >
-                            Reject
+                            Reject all
                           </button>
                         </div>
                       </Td>
@@ -176,10 +214,7 @@ export function QcTab() {
             "Remark",
           ]}
         >
-          {state.qcIntimations
-            .slice()
-            .reverse()
-            .map((q, i) => (
+          {slips.rows.map((q, i) => (
               <Tr key={q.id} zebra={i % 2 === 1}>
                 <Td num strong>{q.id}</Td>
                 <Td num>{q.date}</Td>
@@ -198,6 +233,7 @@ export function QcTab() {
               </Tr>
             ))}
         </Table>
+        <Pager {...slips} />
         {state.qcIntimations.length === 0 && (
           <EmptyNote>No intimations yet — send a GRN to QC from the GRN register.</EmptyNote>
         )}
@@ -213,14 +249,13 @@ export function QcTab() {
             "GRN no",
             "Product name",
             { label: "Total qty", align: "right" },
+            { label: "Accepted", align: "right" },
+            { label: "Rejected", align: "right" },
             "Status",
             "Remark",
           ]}
         >
-          {state.arRecords
-            .slice()
-            .reverse()
-            .map((a, i) => {
+          {ars.rows.map((a, i) => {
               const q = state.qcIntimations.find((x) => x.id === a.intimationId);
               return (
                 <Tr key={a.arNo} zebra={i % 2 === 1}>
@@ -230,20 +265,27 @@ export function QcTab() {
                   <Td num>{q?.grnNo ?? "—"}</Td>
                   <Td>{q?.productName ?? "—"}</Td>
                   <Td right num>{q ? fmtQty(q.totalQty, unitOf.get(q.grnNo)) : "—"}</Td>
+                  <Td right num>{a.acceptedQty === null || !q ? "—" : fmtQty(a.acceptedQty, unitOf.get(q.grnNo))}</Td>
+                  <Td right num>
+                    {a.acceptedQty === null || !q || q.totalQty - a.acceptedQty <= 0 ? "—" : (
+                      <span style={{ color: "var(--red)" }}>{fmtQty(q.totalQty - a.acceptedQty, unitOf.get(q.grnNo))}</span>
+                    )}
+                  </Td>
                   <Td><StatusChip status={a.status} /></Td>
                   <Td muted>{a.remark || "—"}</Td>
                 </Tr>
               );
             })}
         </Table>
+        <Pager {...ars} />
         {state.arRecords.length === 0 && <EmptyNote>No A.R. records yet.</EmptyNote>}
       </Card>
 
       <p className="text-[11px] leading-relaxed text-muted">
-        Both registers match your handwritten formats. Approving moves the material into store
-        stock; rejected material never enters stock — it goes to the rejection list and, per your
-        answer, is destroyed after communication with the vendor, not returned. A held item is
-        re-tested and then approved or rejected; the earlier HOLD record stays in the register.
+        Both registers match your handwritten formats. Approve takes the accepted quantity (leave it empty for the whole
+        lot): only that part moves into store stock; the rest is rejected, never enters stock, and goes to Purchase for a
+        debit note to the vendor — so a reason is required. Reject rejects the whole lot (also to a debit note). A held
+        item is re-tested and then approved or rejected; the earlier HOLD record stays in the register.
       </p>
     </div>
   );

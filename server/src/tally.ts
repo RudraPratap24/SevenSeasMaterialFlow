@@ -5,7 +5,8 @@
  * What has arrived against a PO is tracked on our gate entries, never on the PO.
  */
 import type { RowDataPacket } from "mysql2/promise";
-import type { FlowState, TallyPo } from "../../src/flow/types";
+import { gstSplit } from "../../src/flow/logic";
+import type { FlowState, GstType, TallyPo } from "../../src/flow/types";
 import type { Conn } from "./db";
 import { loadState, persistChanges, requestResync, skipTallyPoNumbers } from "./repository";
 
@@ -191,8 +192,9 @@ export async function importTallyPurchaseOrders(
   const unique = new Set(codeOf.keys());
   // Else the code Store picked on an earlier GRN of the same Tally item (latest wins).
   const [picked] = await conn.query<import("mysql2/promise").RowDataPacket[]>(
-    `SELECT l.item_name, r.component_code FROM goods_receipts r
-       JOIN gate_entry_lines l ON l.gate_entry_no = r.gate_entry_no AND l.line_no = r.gate_line_no
+    `SELECT COALESCE(NULLIF(r.po_item_name, ''), l.item_name) AS item_name, r.component_code FROM goods_receipts r
+       LEFT JOIN gate_entry_lines l ON l.gate_entry_no = r.gate_entry_no AND l.line_no = r.gate_line_no
+      WHERE r.po_item_name <> '' OR l.item_name IS NOT NULL
       ORDER BY r.seq`,
   );
   for (const p of picked) {
@@ -506,6 +508,8 @@ export interface PoForTally {
   reference: string;
   /** Item names and units exactly as in Tally. */
   lines: { item: string; unit: string; qty: number; rate: number }[];
+  /** GST ledgers to add (CGST + SGST, or IGST); absent on POs from before GST. */
+  gst?: GstType;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -514,15 +518,31 @@ const money = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 /**
  * The request that creates one Purchase Order in Tally, in the shape of the client's own POs (party ledger with the
  * total, items with rate/amount/qty, godown "Main Location", the PO number as order number, purchase ledger
- * "Purchase-Gst"). shortcut: no GST lines yet — the PO goes in at the before-GST total; add IGST / CGST+SGST once
- * the rule (vendor state × item GST rate) is agreed with Accounts.
+ * "Purchase-Gst"). GST as on the client's own POs: one ledger line per head (CGST + SGST, or IGST — Tally's own
+ * ledger names) and the party gets the total with GST.
  */
 export function purchaseOrderCreateRequest(company: string, po: PoForTally, purchaseLedger = "Purchase-Gst", godown = "Main Location"): string {
   // Tally refuses an order line without a due date ("Due Date of Order is missing") and reads it only from the P
   // attribute, as in its own export. No due date on the PO: the PO date, as Tally does for a PO entered by hand.
   const [, d, m, y] = po.dueDate.match(/^(\d{2})-(\d{2})-(\d{4})$/) ?? [, po.date.slice(6, 8), po.date.slice(4, 6), po.date.slice(0, 4)];
   const dueText = `${Number(d)}-${MONTHS[Number(m) - 1]}-${y!.slice(2)}`;
-  const total = po.lines.reduce((n, l) => n + Math.round(l.qty * l.rate * 100) / 100, 0);
+  const tax = gstSplit(po.lines.reduce((n, l) => n + Math.round(l.qty * l.rate * 100) / 100, 0), po.gst);
+  const taxLines = (
+    [
+      ["CGST", tax.cgst],
+      ["SGST", tax.sgst],
+      ["IGST", tax.igst],
+    ] as const
+  )
+    .filter(([, amount]) => amount > 0)
+    .map(
+      ([ledger, amount]) => `<LEDGERENTRIES.LIST>
+      <LEDGERNAME>${ledger}</LEDGERNAME>
+      <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+      <AMOUNT>-${money(amount)}</AMOUNT>
+     </LEDGERENTRIES.LIST>`,
+    )
+    .join("\n     ");
   const items = po.lines
     .map((l) => {
       const amount = money(l.qty * l.rate);
@@ -570,8 +590,9 @@ export function purchaseOrderCreateRequest(company: string, po: PoForTally, purc
       <LEDGERNAME>${xmlText(po.party)}</LEDGERNAME>
       <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
       <ISPARTYLEDGER>Yes</ISPARTYLEDGER>
-      <AMOUNT>${money(total)}</AMOUNT>
+      <AMOUNT>${money(tax.total)}</AMOUNT>
      </LEDGERENTRIES.LIST>
+     ${taxLines}
    </VOUCHER>
   </TALLYMESSAGE></DATA>
  </BODY>

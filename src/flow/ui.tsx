@@ -127,11 +127,11 @@ export function Table({
   );
 }
 
-export function Tr({ children, zebra }: { children: ReactNode; zebra?: boolean }) {
+export function Tr({ children, zebra, bg }: { children: ReactNode; zebra?: boolean; bg?: string }) {
   return (
     <tr
       className="border-b border-rule align-top last:border-b-0"
-      style={{ background: zebra ? "#FAFAFA" : "var(--card)" }}
+      style={{ background: bg ?? (zebra ? "#FAFAFA" : "var(--card)") }}
     >
       {children}
     </tr>
@@ -188,6 +188,7 @@ export function TextInput({
   onChange,
   placeholder,
   numeric,
+  caps,
   ariaLabel,
   list,
 }: {
@@ -195,14 +196,19 @@ export function TextInput({
   onChange: (v: string) => void;
   placeholder?: string;
   numeric?: boolean;
+  /** Shown in capitals (the caller upper-cases on save). Rewriting the value while typing breaks phone keyboards. */
+  caps?: boolean;
   ariaLabel?: string;
   list?: string;
 }) {
   return (
     <input
-      className={`field h-8 ${numeric ? "num text-right" : ""}`}
+      className={`field h-8 ${numeric ? "num text-right" : ""} ${caps ? "uppercase placeholder:normal-case" : ""}`}
       type="text"
       inputMode={numeric ? "numeric" : undefined}
+      autoCapitalize={caps ? "characters" : undefined}
+      autoCorrect={caps ? "off" : undefined}
+      spellCheck={caps ? false : undefined}
       value={value}
       placeholder={placeholder}
       // No placeholder fallback: unless a caller passes an explicit ariaLabel,
@@ -280,6 +286,7 @@ export function SearchPicker({
   ariaLabel,
   minWidth = 0,
   className = "field h-8 w-full",
+  limit = 50,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -288,6 +295,8 @@ export function SearchPicker({
   ariaLabel: string;
   minWidth?: number;
   className?: string;
+  /** Most matches listed at once (long lists: type to narrow). */
+  limit?: number;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -296,7 +305,7 @@ export function SearchPicker({
   const term = value.trim().toLowerCase();
   const matches = options
     .filter((o) => !term || o.value.toLowerCase().includes(term) || (o.hint ?? "").toLowerCase().includes(term))
-    .slice(0, 50);
+    .slice(0, limit);
   const show = () => setAt(input.current?.getBoundingClientRect() ?? null);
   const pick = (v: string) => {
     onChange(v);

@@ -1,108 +1,50 @@
 import { useState } from "react";
 import { useAuth } from "../auth";
-import { dateKey, deriveTallyPoProgress, numberTaken, tallyStatusOf } from "../logic";
+import { GST_LABEL, dateKey, debitNotesDue, deriveTallyPoProgress, gstSplit, numberTaken, tallyStatusOf } from "../logic";
 import { api } from "../api";
-import type { PurchaseOrder, Supplier } from "../types";
+import type { GstType, PurchaseOrder, Supplier } from "../types";
 import { todayLabel, useFlow, useTallyStatus, type TallyStatus } from "../store";
 import { Card, Chip, DateInput, EmptyNote, Field, Pager, SearchPicker, Table, Td, TextInput, Tr, fmt, fmtQty, usePaged } from "../ui";
+import { ClipboardList, FilePlus2, FileMinus2, ShoppingCart, Store, Users } from "lucide-react";
+import { VerifiedRequestsCard } from "./IndentRequests";
+import { CardFlow, type Node } from "./ProductionTab";
 
-export function PurchaseTab() {
-  const { shortList, state, poProgress, suppliers, addIndent } = useFlow();
-  const { can } = useAuth();
+const PURCHASE_CARDS: Node[] = [
+  {
+    title: "Indent Creation",
+    tone: "purple",
+    icon: FilePlus2,
+    art: ClipboardList,
+    view: () => (
+      <div className="space-y-3">
+        <VerifiedRequestsCard />
+        <IndentsCard forPo={false} />
+      </div>
+    ),
+  },
+  {
+    title: "Raise PO",
+    tone: "blue",
+    icon: ShoppingCart,
+    art: ShoppingCart,
+    view: () => (
+      <div className="space-y-3">
+        <IndentsCard forPo />
+        <PurchaseOrdersCard />
+      </div>
+    ),
+  },
+  { title: "Debit Note", tone: "rose", icon: FileMinus2, art: FileMinus2, view: () => <DebitNotesCard /> },
+  { title: "Suppliers", tone: "green", icon: Users, art: Store, view: () => <SuppliersCard /> },
+];
 
-  return (
-    <div className="space-y-3">
-      <Card title="Below minimum level — buy list" step="SHORT LIST" role="Purchase">
-        <Table
-          minWidth={800}
-          headers={[
-            "Code",
-            "Component",
-            { label: "Minimum level", align: "right" },
-            { label: "In stock", align: "right" },
-            { label: "Short by", align: "right" },
-            "",
-          ]}
-        >
-          {shortList.map((r, i) => {
-            const vendor = poVendors(suppliers).find((s) => r.code in s.rates)?.name;
-            const hasIndent = state.indents.some(
-              (x) => x.componentCode === r.code && x.status === "OPEN",
-            );
-            const hasPo = poProgress.some(
-              (p) => !p.closed && p.lines.some((l) => l.code === r.code && l.pending > 0),
-            );
-            return (
-              <Tr key={r.code} zebra={i % 2 === 1}>
-                <Td num muted>{r.code}</Td>
-                <Td>{r.name}</Td>
-                <Td right num>{fmt(r.minLevel ?? 0)}</Td>
-                <Td right num>{fmt(r.closing)}</Td>
-                <Td right num strong>
-                  <span style={{ color: "var(--amber)" }}>{fmt((r.minLevel ?? 0) - r.closing)}</span>
-                </Td>
-                <Td>
-                  {hasPo ? (
-                    <Chip label="PO RAISED" tone="blue" />
-                  ) : hasIndent ? (
-                    <Chip label="INDENT OPEN" tone="amber" />
-                  ) : can("purchase.indent") ? (
-                    <button
-                      className="btn h-6 px-2 text-[11px]"
-                      disabled={!vendor}
-                      title={vendor ? `Indent to ${vendor} (price master)` : "No vendor has a rate for it — use New indent"}
-                      onClick={() =>
-                        vendor &&
-                        addIndent({
-                          date: todayLabel(),
-                          componentCode: r.code,
-                          componentName: r.name,
-                          qty: Math.max(0, (r.minLevel ?? 0) * 2 - r.closing),
-                          reason: "Below minimum level",
-                          supplierName: vendor,
-                          rate: suppliers.find((x) => x.name === vendor)!.rates[r.code],
-                        })
-                      }
-                    >
-                      Create indent
-                    </button>
-                  ) : (
-                    <span className="text-[11px] text-muted">—</span>
-                  )}
-                </Td>
-              </Tr>
-            );
-          })}
-        </Table>
-        {shortList.length === 0 && (
-          <EmptyNote>
-            Nothing below minimum level. Minimum levels come with your data (demo data loads
-            example levels); an indent can always be made manually from the Indents card.
-          </EmptyNote>
-        )}
-      </Card>
-
-      <IndentsCard />
-
-      <PurchaseOrdersCard />
-
-      <SuppliersCard />
-
-      <p className="text-[11px] leading-relaxed text-muted">
-        The chain follows your answers: minimum level → indent → purchase raises the PO →
-        management approves → gate picks the PO on arrival → GRN receipts reduce the pending
-        quantity, PO closes when fully received (OTIF). Rates come from the fixed price master.
-        Minimum levels shown are demo values until your real list arrives.
-      </p>
-    </div>
-  );
-}
+export const PurchaseTab = () => <CardFlow root="Purchase" top={PURCHASE_CARDS} />;
 
 /**
- * Indents, filtered by vendor. Purchase ticks a vendor's open indents and raises ONE PO for them:
- * one line per item (ticked indents of the same item add up), rate from the price master.
+ * Indents, filtered by vendor. In Indent Creation: the list and "New indent". In Raise PO: Purchase ticks a vendor's
+ * open indents and raises ONE PO for them — one line per item (ticked indents of the same item add up).
  */
-function IndentsCard() {
+function IndentsCard({ forPo }: { forPo: boolean }) {
   const { state, suppliers, raisePo } = useFlow();
   const { can } = useAuth();
   const [vendor, setVendor] = useState("");
@@ -111,7 +53,9 @@ function IndentsCard() {
   /** Purchase's edits to a line, by PMS code; otherwise the indents' total and the price-master rate. */
   const [edits, setEdits] = useState<Record<string, { qty?: string; rate?: string }>>({});
   const [expected, setExpected] = useState(todayLabel);
-  const mayRaise = can("purchase.po");
+  /** Chosen by Purchase for each PO (the vendor's state decides); never guessed. */
+  const [gst, setGst] = useState<GstType | "">("");
+  const mayRaise = forPo && can("purchase.po");
 
   // The typed vendor, once it is exactly one on the list; until then the text just narrows the indents.
   const exact = poVendors(suppliers).find((x) => x.name.toLowerCase() === vendor.trim().toLowerCase())?.name ?? "";
@@ -139,12 +83,14 @@ function IndentsCard() {
   });
   const amountOf = (l: { qty: string; rate: string }) => (Number(l.qty) || 0) * (Number(l.rate) || 0);
   const total = items.reduce((n, l) => n + amountOf(l), 0);
-  const ready = exact && items.length > 0 && items.every((l) => Number(l.qty) > 0 && Number(l.rate) > 0);
+  const tax = gstSplit(total, gst || undefined);
+  const ready = exact && items.length > 0 && gst !== "" && items.every((l) => Number(l.qty) > 0 && Number(l.rate) > 0);
 
   function pickVendor(name: string) {
     setVendor(name);
     setTicked([]);
     setEdits({});
+    setGst("");
     paged.setPage(0);
   }
   const tick = (id: string, on: boolean) => setTicked((t) => (on ? [...t, id] : t.filter((x) => x !== id)));
@@ -164,19 +110,21 @@ function IndentsCard() {
       })),
       expectedDate: expected.trim(),
       indentIds: ticked,
+      gst: gst || undefined,
     });
     if (!ok) return;
     setTicked([]);
     setEdits({});
+    setGst("");
     setExpected(todayLabel());
   }
 
   return (
     <Card
-      title="Indents"
+      title={forPo ? "Raise PO from indents" : "Indents"}
       step="PURCHASE REQUEST"
       role="Purchase"
-      right={can("purchase.indent") ? <ManualIndentButton /> : null}
+      right={!forPo && can("purchase.indent") ? <ManualIndentButton /> : null}
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-rule bg-zebra px-3 py-2">
         <div className="w-[340px]">
@@ -288,25 +236,58 @@ function IndentsCard() {
                   <Td right num>{amountOf(l) > 0 ? rupees(amountOf(l)) : "—"}</Td>
                 </Tr>
               ))}
-              <Tr>
-                <Td strong>Total (before GST)</Td>
-                <Td>{""}</Td>
-                <Td>{""}</Td>
-                <Td>{""}</Td>
-                <Td right num strong>{rupees(total)}</Td>
-              </Tr>
+              {(
+                [
+                  ["Total (before GST)", total, true],
+                  ...(gst === "INTRA"
+                    ? [
+                        ["CGST 9%", tax.cgst, false],
+                        ["SGST 9%", tax.sgst, false],
+                      ]
+                    : gst === "INTER"
+                      ? [["IGST 18%", tax.igst, false]]
+                      : []),
+                ] as [string, number, boolean][]
+              ).map(([label, amount, strong]) => (
+                <Tr key={label}>
+                  <Td strong={strong}>{label}</Td>
+                  <Td>{""}</Td>
+                  <Td>{""}</Td>
+                  <Td>{""}</Td>
+                  <Td right num strong={strong}>{rupees(amount)}</Td>
+                </Tr>
+              ))}
+              {gst && (
+                <Tr bg="var(--green-soft)">
+                  <Td strong>Final amount (with GST)</Td>
+                  <Td>{""}</Td>
+                  <Td>{""}</Td>
+                  <Td>{""}</Td>
+                  <Td right num strong>{rupees(tax.total)}</Td>
+                </Tr>
+              )}
             </Table>
           </div>
+          <fieldset className="mt-2 flex flex-wrap items-center gap-3 text-[12px]">
+            <legend className="col-head mb-1">GST * — vendor in which state?</legend>
+            {(["INTRA", "INTER"] as const).map((g) => (
+              <label key={g} className="flex cursor-pointer items-center gap-1.5 rounded-[3px] border border-rule bg-white px-2 py-1">
+                <input type="radio" name="po-gst" checked={gst === g} onChange={() => setGst(g)} />
+                {GST_LABEL[g]}
+              </label>
+            ))}
+          </fieldset>
           <div className="mt-2 flex flex-wrap items-end gap-2">
             <Field label="Expected date">
               <DateInput value={expected} onChange={setExpected} ariaLabel="Expected date" />
             </Field>
             <button className="btn btn-primary h-8" onClick={raise} disabled={!ready}>
-              Raise one PO — {rupees(total)} — goes for approval
+              Raise one PO — {rupees(gst ? tax.total : total)}{gst ? " with GST" : ""} — goes for approval
             </button>
             {!ready && items.some((l) => !(Number(l.rate) > 0)) && (
               <span className="text-[11px] text-muted">Enter the rate for every item.</span>
             )}
+            {!ready && gst === "" && <span className="text-[11px] text-muted">Choose GST: same state or other state.</span>}
           </div>
         </div>
       )}
@@ -326,7 +307,9 @@ function ManualIndentButton() {
 
   const comp = masters.componentByCode.get(code.trim().toUpperCase());
   // The vendor with a fixed rate for this material, unless Purchase picks another (exactly one on the list).
-  const suggested = comp ? poVendors(suppliers).find((x) => comp.code in x.rates)?.name ?? "" : "";
+  const suggested = comp
+    ? (poVendors(suppliers).find((x) => comp.code in x.rates) ?? poVendors(suppliers).find((x) => x.supplies?.includes(comp.code)))?.name ?? ""
+    : "";
   const chosen = vendor.trim()
     ? poVendors(suppliers).find((x) => x.name.toLowerCase() === vendor.trim().toLowerCase())?.name ?? ""
     : suggested;
@@ -384,7 +367,12 @@ function ManualIndentButton() {
               ariaLabel="Indent vendor"
               options={poVendors(suppliers).map((x) => ({
                 value: x.name,
-                hint: [comp && comp.code in x.rates ? `fixed rate ₹${x.rates[comp.code]} for this item` : "", x.city].filter(Boolean).join(" · "),
+                hint: [
+                  comp && comp.code in x.rates ? `fixed rate ₹${x.rates[comp.code]} for this item` : comp && x.supplies?.includes(comp.code) ? "supplies this item" : "",
+                  x.city,
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
               }))}
             />
           </div>
@@ -434,16 +422,16 @@ interface PoRow {
     indents: string[];
   }[];
 }
-type PoState = "approval" | "open" | "received" | "closedByHand" | "cancelled";
+type PoState = "approval" | "open" | "received" | "closedByHand" | "cancelled" | "rejected";
 
 /**
  * Every PO — raised in this app or from Tally — with its status, one place: pending approval → approved/open →
  * closed (fully received, automatically; or by hand with a reason) — or cancelled in Tally. 10 per page.
  */
 function PurchaseOrdersCard() {
-  const { state, poProgress, approvePo, closePo, reopenPo, closePosBefore } = useFlow();
+  const { state, poProgress, closePo, reopenPo, closePosBefore } = useFlow();
   const ours = new Set(state.purchaseOrders.filter((p) => !numberTaken(p)).map((p) => p.id));
-  const { can, user } = useAuth();
+  const { can } = useAuth();
   const status = useTallyStatus();
   const [search, setSearch] = useState("");
   const [show, setShow] = useState<"all" | "open" | "approval" | "closed">("all");
@@ -515,8 +503,10 @@ function PurchaseOrdersCard() {
       ? "cancelled"
       : closure.has(r.poNo)
         ? "closedByHand"
-        : r.app && r.app.status !== "APPROVED"
-          ? "approval"
+        : r.app?.status === "REJECTED"
+          ? "rejected"
+          : r.app && r.app.status !== "APPROVED"
+            ? "approval"
           : r.lines.every((l) => l.pending === 0)
             ? "received"
             : "open";
@@ -627,12 +617,13 @@ function PurchaseOrdersCard() {
                   {r.expectedDate && <span className="num text-[11.5px] text-muted">expected {r.expectedDate}</span>}
                 </button>
                 <span className="ml-auto flex flex-wrap items-center gap-1.5">
-                  {r.value !== null && <span className="num text-[12px] font-semibold">Total {rupees(r.value)}</span>}
+                  {r.value !== null && <PoTotal value={r.value} gst={r.app?.gst} />}
                   {r.app?.status === "APPROVED" && <TallyChip po={r.app} />}
                   {st === "cancelled" && <Chip label="CANCELLED IN TALLY" tone="red" />}
                   {st === "closedByHand" && c && <Chip label={`CLOSED — ${c.reason} (${c.by}, ${c.date})`} tone="muted" />}
                   {st === "received" && <Chip label="CLOSED — FULLY RECEIVED" tone="green" />}
                   {st === "approval" && <Chip label="PENDING APPROVAL" tone="amber" />}
+                  {st === "rejected" && <Chip label={`REJECTED — ${r.app?.rejectReason ?? ""} (${r.app?.rejectedBy ?? ""})`} tone="red" />}
                   {st === "open" && <Chip label={r.app ? `APPROVED — ${r.app.approvedBy}` : "OPEN"} tone="blue" />}
                   {can("purchase.close") && st === "open" && (
                     <button className="btn h-6 px-2 text-[11px]" disabled={!reason.trim()} onClick={() => closePo(r.poNo, reason, "", "")}>
@@ -674,20 +665,12 @@ function PurchaseOrdersCard() {
                       </Td>
                     </Tr>
                   ))}
+                  {r.value !== null && <GstRows value={r.value} gst={r.app?.gst} before={r.indentIds.length ? 4 : 3} after={2} />}
                 </Table>
               </div>
               )}
-              {st === "approval" && can("purchase.approve") && r.app && (
-                <button
-                  className="btn mt-2 h-7 px-2 text-[11px]"
-                  style={{ borderColor: "var(--green)", color: "var(--green)" }}
-                  onClick={() => approvePo(r.poNo, user?.label ?? "Owner")}
-                >
-                  Approve PO
-                </button>
-              )}
-              {st === "approval" && !can("purchase.approve") && (
-                <p className="mt-2 text-[11.5px] text-muted">Waiting for the owner's approval — management approves every PO.</p>
+              {st === "approval" && (
+                <p className="mt-2 text-[11.5px] text-muted">Waiting for the owner's approval — approved in the PO Approval tab.</p>
               )}
             </div>
           );
@@ -736,7 +719,7 @@ function SuppliersCard() {
         />
       }
     >
-      <Table minWidth={600} headers={["Supplier", "City", "Materials with fixed rate"]}>
+      <Table minWidth={600} headers={["Supplier", "City", "Materials with fixed rate", "Also supplies (no fixed rate)"]}>
         {paged.rows.map((s, i) => (
           <Tr key={s.name} zebra={i % 2 === 1}>
             <Td strong>{s.name}</Td>
@@ -746,6 +729,7 @@ function SuppliersCard() {
                 .map(([code, rate]) => `${masters.componentByCode.get(code)?.name ?? code} @ ₹${rate}`)
                 .join(" · ") || "—"}
             </Td>
+            <Td muted>{s.supplies?.map((code) => masters.componentByCode.get(code)?.name ?? code).join(" · ") || "—"}</Td>
           </Tr>
         ))}
       </Table>
@@ -755,12 +739,56 @@ function SuppliersCard() {
   );
 }
 
+/** A PO's total on its header line: the final amount with GST (POs from before GST: the plain total). */
+export function PoTotal({ value, gst }: { value: number; gst?: GstType }) {
+  return (
+    <span className="num text-[12px] font-semibold" title={gst ? GST_LABEL[gst] : undefined}>
+      Total {rupees(gstSplit(value, gst).total)}
+      {gst && <span className="ml-1 text-[10.5px] font-normal text-muted">incl. GST</span>}
+    </span>
+  );
+}
+
+/** The rows under a PO's items: before GST, CGST + SGST or IGST, and the final amount. `before`/`after`: empty cells around the Amount column. */
+export function GstRows({ value, gst, before, after }: { value: number; gst?: GstType; before: number; after: number }) {
+  if (!gst) return null;
+  const t = gstSplit(value, gst);
+  const rows: [string, number][] = [
+    ["Total (before GST)", t.taxable],
+    ...(gst === "INTRA"
+      ? ([
+          ["CGST 9%", t.cgst],
+          ["SGST 9%", t.sgst],
+        ] as [string, number][])
+      : ([["IGST 18%", t.igst]] as [string, number][])),
+  ];
+  const pad = (n: number) => Array.from({ length: n }, (_, i) => <Td key={i}>{""}</Td>);
+  return (
+    <>
+      {rows.map(([label, amount], i) => (
+        <Tr key={label}>
+          <Td strong={i === 0}>{label}</Td>
+          {pad(before)}
+          <Td right num strong={i === 0}>{rupees(amount)}</Td>
+          {pad(after)}
+        </Tr>
+      ))}
+      <Tr bg="var(--green-soft)">
+        <Td strong>Final amount (with GST)</Td>
+        {pad(before)}
+        <Td right num strong>{rupees(t.total)}</Td>
+        {pad(after)}
+      </Tr>
+    </>
+  );
+}
+
 /** ₹ with Indian grouping, paise kept when there are any. */
 const rupees = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
 
 /** Once vendors come from Tally, only those (so every PO can go to Tally); before that, every approved supplier. */
-const poVendors = (suppliers: Supplier[]) => (suppliers.some((x) => x.fromTally) ? suppliers.filter((x) => x.fromTally) : suppliers);
+export const poVendors = (suppliers: Supplier[]) => (suppliers.some((x) => x.fromTally) ? suppliers.filter((x) => x.fromTally) : suppliers);
 
 /**
  * Where an approved PO raised here stands with Tally: created there (read back, same items) / sent and waiting for the
@@ -837,5 +865,144 @@ function SyncHealth({ status }: { status: TallyStatus | null }) {
       )}{" "}
       The app keeps working on the copy from {status.syncedAt || "—"}.
     </p>
+  );
+}
+
+/**
+ * What QC rejected, waiting for Purchase's debit note to the vendor (rejected qty × rate), and the notes raised.
+ * The rate comes from the app PO where it has one; POs copied from Tally carry no rate here, so Purchase enters it.
+ */
+function DebitNotesCard() {
+  const { state, addDebitNote } = useFlow();
+  const { can } = useAuth();
+  const mayRaise = can("purchase.debitnote");
+  const due = debitNotesDue(state);
+  const [drafts, setDrafts] = useState<Record<string, { rate: string; reason: string }>>({});
+  const poRate = (poNo: string, code: string) =>
+    state.purchaseOrders.find((p) => p.id === poNo)?.lines.find((l) => l.componentCode === code)?.rate ?? null;
+
+  return (
+    <Card title="Debit notes" step="QC REJECTED" role={`Purchase · ${due.length} waiting`}>
+      {due.length === 0 ? (
+        <EmptyNote>Nothing waiting — every quantity QC rejected has its debit note.</EmptyNote>
+      ) : (
+        <Table
+          minWidth={1150}
+          headers={[
+            "GRN no",
+            "Supplier",
+            "Invoice no",
+            "PO no",
+            "Item",
+            { label: "Rejected", align: "right" },
+            "QC reason (A.R.)",
+            ...(mayRaise ? [{ label: "Rate ₹", align: "right" as const }, { label: "Amount", align: "right" as const }, "Reason to vendor", ""] : []),
+          ]}
+        >
+          {due.map((d, i) => {
+            const known = poRate(d.grn.poNo, d.grn.componentCode);
+            const draft = drafts[d.grn.grnNo] ?? { rate: known === null ? "" : String(known), reason: d.reason };
+            const set = (patch: Partial<typeof draft>) => setDrafts((x) => ({ ...x, [d.grn.grnNo]: { ...draft, ...patch } }));
+            const rate = Number(draft.rate);
+            return (
+              <Tr key={d.grn.grnNo} zebra={i % 2 === 1}>
+                <Td num strong>{d.grn.grnNo}</Td>
+                <Td>{d.grn.supplierName}</Td>
+                <Td num>{d.grn.invoiceNo || "—"}</Td>
+                <Td num>{d.grn.poNo || "—"}</Td>
+                <Td>
+                  {d.grn.componentName} <span className="num text-muted">{d.grn.componentCode}</span>
+                </Td>
+                <Td right num strong>
+                  {fmtQty(d.qty, d.grn.unit)} {d.grn.unit}
+                </Td>
+                <Td muted>
+                  {d.reason || "—"} <span className="num">({d.arNo})</span>
+                </Td>
+                {mayRaise && (
+                  <>
+                    <Td right>
+                      <input
+                        className="field num h-7 w-24 text-right"
+                        inputMode="decimal"
+                        value={draft.rate}
+                        onChange={(e) => set({ rate: e.target.value.replace(/[^\d.]/g, "") })}
+                        placeholder={known === null ? "enter" : ""}
+                        aria-label={`Rate for ${d.grn.grnNo}`}
+                      />
+                    </Td>
+                    <Td right num>{rate > 0 ? rupees(Math.round(d.qty * rate * 100) / 100) : "—"}</Td>
+                    <Td>
+                      <input
+                        className="field h-7 w-56"
+                        value={draft.reason}
+                        onChange={(e) => set({ reason: e.target.value })}
+                        aria-label={`Reason for ${d.grn.grnNo}`}
+                      />
+                    </Td>
+                    <Td>
+                      <button
+                        className="btn btn-primary h-7 px-2 text-[11px]"
+                        disabled={!(rate > 0) || !draft.reason.trim()}
+                        onClick={async () => {
+                          if (await addDebitNote({ grnNo: d.grn.grnNo, rate, reason: draft.reason.trim() })) {
+                            setDrafts(({ [d.grn.grnNo]: _, ...rest }) => rest);
+                          }
+                        }}
+                      >
+                        Create debit note
+                      </button>
+                    </Td>
+                  </>
+                )}
+              </Tr>
+            );
+          })}
+        </Table>
+      )}
+      {state.debitNotes.length > 0 && (
+        <Table
+          minWidth={1100}
+          headers={[
+            "DN no",
+            "Type",
+            "Date",
+            "Supplier",
+            "Invoice no",
+            "GRN / PO",
+            "Item",
+            { label: "Qty", align: "right" },
+            { label: "Rate", align: "right" },
+            { label: "Amount", align: "right" },
+            "Reason",
+            "Raised by",
+          ]}
+        >
+          {state.debitNotes
+            .slice()
+            .reverse()
+            .map((n, i) => (
+              <Tr key={n.id} zebra={i % 2 === 1}>
+                <Td num strong>{n.id}</Td>
+                <Td>{n.kind === "SHORT_SUPPLY" ? <Chip label="SHORT SUPPLY" tone="amber" /> : <Chip label="QC REJECTED" tone="red" />}</Td>
+                <Td num>{n.date}</Td>
+                <Td>{n.supplierName}</Td>
+                <Td num strong>{n.invoiceNo || "—"}</Td>
+                <Td num>
+                  {n.grnNo} / {n.poNo || "—"}
+                </Td>
+                <Td>{n.componentName}</Td>
+                <Td right num>
+                  {fmtQty(n.qty, n.unit)} {n.unit}
+                </Td>
+                <Td right num>{rupees(n.rate)}</Td>
+                <Td right num strong>{rupees(n.amount)}</Td>
+                <Td muted>{n.reason}</Td>
+                <Td muted>{n.raisedBy}</Td>
+              </Tr>
+            ))}
+        </Table>
+      )}
+    </Card>
   );
 }

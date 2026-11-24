@@ -43,7 +43,7 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
   const { username, password } = body.data;
 
   const [rows] = await pool.execute<RowDataPacket[]>(
-    `SELECT id, username, password_hash, role, label, active, must_change_password,
+    `SELECT id, username, password_hash, role, label, full_name, active, must_change_password,
             failed_logins, (locked_until IS NOT NULL AND locked_until > NOW(3)) AS locked,
             CEIL(TIMESTAMPDIFF(SECOND, NOW(3), locked_until) / 60) AS lock_minutes
        FROM users WHERE username = ?`,
@@ -60,7 +60,7 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
   if (Number(u.locked) === 1) {
     await verifyDummy(password);
     await audit(req, { action: "auth.login", outcome: "denied", message: "account locked", username });
-    res.status(429).json({ error: `Too many wrong passwords. Try again in ${Math.max(1, Number(u.lock_minutes))} min.` });
+    res.status(401).json({ error: WRONG });
     return;
   }
 
@@ -96,6 +96,7 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
     username: u.username,
     role: u.role,
     label: u.label,
+    name: u.full_name,
     mustChangePassword: Number(u.must_change_password) === 1,
     sessionId: "",
   };
@@ -120,9 +121,9 @@ export function passwordProblem(password: string, username: string): string | nu
   if (password.length > 128) return "Use at most 128 characters.";
   const lower = password.toLowerCase();
   if (lower.includes(username.toLowerCase())) return "The password must not contain the login ID.";
-  if (/^seven@/.test(lower) || /^(.)\1+$/.test(password) || /^(password|12345|qwerty)/.test(lower)) {
-    return "That password is too easy to guess.";
-  }
+  // the default passwords (seven@store, seven@gate …) only — "Seven@Store2026!" is fine
+  if (/^seven@[a-z]*$/.test(lower)) return "That is one of the default passwords — choose your own.";
+  if (/^(.)\1+$/.test(password) || /^(password|12345|qwerty)/.test(lower)) return "That password is too easy to guess.";
   const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((r) => r.test(password)).length;
   if (classes < 3 && password.length < 16) {
     return "Mix at least three of: lower case, upper case, digits, symbols — or use 16+ characters.";
@@ -130,12 +131,23 @@ export function passwordProblem(password: string, username: string): string | nu
   return null;
 }
 
+/** Per-login brake on guessing the current password from an open session (each try is a full password hash). */
+const changeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => `user:${req.user?.id ?? "none"}`,
+  message: { error: "Too many tries. Try again in 15 minutes." },
+});
+
 const ChangeBody = z.strictObject({
   currentPassword: z.string().min(1).max(200),
   newPassword: z.string().min(1).max(200),
 });
 
-authRouter.post("/change-password", requireUser, async (req, res) => {
+authRouter.post("/change-password", requireUser, changeLimiter, async (req, res) => {
   const body = ChangeBody.safeParse(req.body);
   if (!body.success) {
     res.status(400).json({ error: "Enter the current and the new password." });
@@ -146,6 +158,12 @@ authRouter.post("/change-password", requireUser, async (req, res) => {
 
   const [rows] = await pool.execute<RowDataPacket[]>("SELECT password_hash FROM users WHERE id = ?", [user.id]);
   if (!rows[0] || !(await verifyPassword(currentPassword, rows[0].password_hash))) {
+    // counts toward the same lockout as the login, so an open session cannot be used to guess the password
+    await pool.execute("UPDATE users SET failed_logins = failed_logins + 1 WHERE id = ?", [user.id]);
+    await pool.execute(
+      "UPDATE users SET failed_logins = 0, locked_until = DATE_ADD(NOW(3), INTERVAL ? MINUTE) WHERE id = ? AND failed_logins >= ?",
+      [config.LOGIN_LOCK_MINUTES, user.id, config.LOGIN_MAX_FAILURES],
+    );
     await audit(req, { action: "auth.change-password", outcome: "denied", message: "wrong current password" });
     res.status(400).json({ error: "The current password is wrong." });
     return;
@@ -164,7 +182,9 @@ authRouter.post("/change-password", requireUser, async (req, res) => {
     "UPDATE users SET password_hash = ?, must_change_password = 0, password_changed_at = NOW(3) WHERE id = ?",
     [await hashPassword(newPassword), user.id],
   );
-  await destroyOtherSessions(user.id, user.sessionId);
+  // every old session ends, this one included: a new session (new cookie) for the new password
+  await destroyOtherSessions(user.id, null);
+  await createSession(req, res, user.id);
   await audit(req, { action: "auth.change-password", outcome: "ok" });
   res.json({ user: publicUser({ ...user, mustChangePassword: false }), demoReset: config.ALLOW_DEMO_RESET });
 });

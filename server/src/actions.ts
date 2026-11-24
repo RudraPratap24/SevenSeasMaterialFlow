@@ -55,10 +55,6 @@ const dateLabel = z
     const t = new Date(Date.UTC(yyyy, mm - 1, dd));
     return t.getUTCDate() === dd && t.getUTCMonth() === mm - 1;
   }, "is not a real date");
-const requiredTime = z
-  .string()
-  .trim()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "is required (hh:mm)");
 const qty = z.number().int("must be a whole number").min(0).max(100_000_000);
 const positiveQty = qty.min(1, "must be more than zero");
 /** A quantity in the PO's unit (Kg, Doz …): up to 3 decimals. */
@@ -99,45 +95,44 @@ function tallyVendor(ctx: ActionContext, name: string) {
 /* ── the registry ───────────────────────────────────────────────────────────── */
 
 export const ACTIONS: Record<ActionName, ActionDef> = {
+  // The gate records the vehicle and its paper; the PO is picked at GRN. Date and time in are the server's.
   addGateEntry: {
     perm: "gate.create",
+    needsSuppliers: true,
     args: z.tuple([
       z.strictObject({
-        date: text(10),
-        // Required only without a PO (checked in the reducer); against a PO both come from the PO.
-        supplierName: text(120),
-        productDesc: text(300),
-        // Not compulsory: free material (e.g. POP with a PO) arrives without an invoice.
-        invoiceNo: text(60),
+        supplierName: required(120),
+        invoiceNo: text(60).transform((s) => s.toUpperCase()),
         invoiceDate: dateLabel,
-        poNo: text(40),
-        invoiceQty: qty.nullable(),
+        invoiceQty: unitQty.nullable(),
+        invoiceQtyUnit: text(20),
         transportName: text(120),
-        lrNo: text(60),
-        vehicleNo: required(30),
-        timeIn: requiredTime,
-        timeOut: z.literal(""), // recorded later, by recordVehicleOut
-        driverSign: z.boolean(),
-        remark,
-        // Name/code/unit are replaced by the PO's own in the reducer; qty and remark are the guard's.
-        lines: z
-          .array(
-            z.strictObject({
-              itemName: required(160),
-              itemCode: text(16),
-              unit: text(16),
-              qty: unitQty,
-              remark: text(300),
-            }),
-          )
-          .max(200),
+        lrNo: text(60).transform((s) => s.toUpperCase()),
+        vehicleNo: required(30).transform((s) => s.toUpperCase()),
+        driverName: text(80),
+        driverPhone: z.string().trim().regex(/^(\+?\d{10,13})?$/, "must be a 10-digit phone number"),
       }),
     ]),
     prepare: ([e], ctx) => {
-      const g = e as { invoiceDate: string; timeIn: string };
+      const g = e as { supplierName: string; invoiceDate: string; invoiceQty: number | null; invoiceQtyUnit: string } & Record<string, unknown>;
+      // any approved supplier may deliver (the screen lists the Tally vendors)
+      if (!ctx.suppliers.some((x) => x.name === g.supplierName)) throw new FlowError(`${g.supplierName} is not an approved supplier.`);
       if (dateKey(g.invoiceDate) > dateKey(ctx.today)) throw new FlowError("Invoice date cannot be after today.");
-      if (g.timeIn > ctx.now) throw new FlowError(`Time in cannot be later than now (${ctx.now}).`);
-      return [{ ...(e as object), date: ctx.today }];
+      if (g.invoiceQty !== null && !g.invoiceQtyUnit.trim()) throw new FlowError("Say the unit of the quantity (Box, Kg …).");
+      return [
+        {
+          ...g,
+          date: ctx.today,
+          timeIn: ctx.now,
+          timeOut: "",
+          driverSign: false,
+          remark: "",
+          productDesc: "",
+          poNo: "",
+          lines: [],
+          hasPhoto: false,
+        },
+      ];
     },
   },
 
@@ -159,6 +154,8 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
         brandName: text(60),
         receivedDate: text(10),
         poNo: text(40),
+        /** The PO item this GRN counts (picked by Store); "" on an arrival without PO. */
+        poItemName: text(160),
         poQty: unitQty.nullable(),
         invoiceNo: text(60),
         supplierName: text(120),
@@ -177,14 +174,15 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
       if (!gate) throw new FlowError(`Gate entry ${line.gateEntryId} not found.`);
       const perBox = line.qtyPerBox as number | null;
       const boxes = line.totalBoxes as number | null;
+      if (perBox !== null && boxes !== null && perBox * boxes > 100_000_000) throw new FlowError("That count is far too large — check the boxes.");
       return [
         {
           ...line,
           componentName: comp.name,
           type: comp.type,
           receivedDate: ctx.today,
-          // The GRN carries forward from its gate entry — never retyped.
-          poNo: gate.poNo,
+          // Supplier and invoice come from the gate entry; the PO too on older entries, else Store's pick.
+          poNo: gate.poNo || line.poNo,
           invoiceNo: gate.invoiceNo,
           supplierName: gate.supplierName,
           totalQty: perBox !== null && boxes !== null ? perBox * boxes : line.totalQty,
@@ -203,9 +201,44 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
     ]),
   },
 
-  recordAr: {
-    perm: "qc.decide",
-    args: z.tuple([docNo, z.enum(["APPROVED", "HOLD", "REJECTED"]), remark]),
+  // Approve may take the accepted quantity (the rest is rejected → debit note); none = the whole lot.
+  recordAr: { perm: "qc.decide", args: z.tuple([docNo, z.enum(["APPROVED", "HOLD", "REJECTED"]), remark, unitQty.nullable().optional()]) },
+
+  // Closing a SHORT / EXCESS escalation: dated and signed by the server.
+  closeEscalation: {
+    perm: "escalation.close",
+    args: z.tuple([docNo, required(500), text(10), text(80)]),
+    prepare: ([grnNo, resolution], ctx) => [grnNo, resolution, ctx.today, ctx.user.label],
+  },
+
+  // A SHORT escalation settled by a debit note for the short qty (or by an indent for the balance): dated and signed here.
+  escalationDebitNote: {
+    perm: "escalation.close",
+    args: z.tuple([
+      z.strictObject({ grnNo: docNo, qty: unitQty, rate: z.number().positive("is required (₹ per unit)").max(10_000_000), reason: required(500) }),
+    ]),
+    prepare: ([d], ctx) => [{ ...(d as object), date: ctx.today, raisedBy: ctx.user.label }],
+  },
+  escalationIndent: {
+    perm: "escalation.close",
+    needsSuppliers: true,
+    args: z.tuple([
+      z.strictObject({ grnNo: docNo, qty: positiveQty, rate: z.number().positive("is required (₹ per unit)").max(10_000_000), reason: text(150) }),
+    ]),
+    prepare: ([d], ctx) => [{ ...(d as object), date: ctx.today, by: ctx.user.label }],
+  },
+
+  // Purchase's debit note for what QC rejected on a GRN: dated and signed by the server.
+  addDebitNote: {
+    perm: "purchase.debitnote",
+    args: z.tuple([
+      z.strictObject({
+        grnNo: docNo,
+        rate: z.number().positive("is required (₹ per unit)").max(10_000_000),
+        reason: required(500),
+      }),
+    ]),
+    prepare: ([d], ctx) => [{ ...(d as object), date: ctx.today, raisedBy: ctx.user.label }],
   },
 
   setBarcoded: { perm: "grn.barcode", args: z.tuple([docNo, z.boolean()]) },
@@ -243,6 +276,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
         {
           ...req,
           date: ctx.today,
+          packingSign: ctx.user.label, // signed by whoever is logged in — never typed
           storeSign: "", // the store signs when it issues
           lines: req.lines.map((l) => ({
             ...l,
@@ -258,6 +292,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
   issueRequisition: {
     perm: "req.issue",
     args: z.tuple([docNo, z.array(qty).max(200), sign]),
+    prepare: ([id, qtys], ctx) => [id, qtys, ctx.user.label],
   },
 
   addMrn: {
@@ -280,6 +315,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
         {
           ...mrn,
           date: ctx.today,
+          sign: ctx.user.label,
           lines: mrn.lines.map((l) => ({ ...l, componentName: component(ctx, l.componentCode).name })),
         },
       ];
@@ -319,6 +355,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
         {
           ...tr,
           date: ctx.today,
+          submittedBy: ctx.user.label,
           checkedBy: "", // FG warehouse signs on receiving
           location: "",
           lines: tr.lines.map((l) => {
@@ -336,7 +373,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
   receiveFgTransfer: {
     perm: "fg.receive",
     args: z.tuple([docNo, sign, text(10), required(80)]),
-    prepare: ([id, checkedBy, , location], ctx) => [id, checkedBy, ctx.today, location],
+    prepare: ([id, , , location], ctx) => [id, ctx.user.label, ctx.today, location],
   },
 
   recordPdi: {
@@ -403,6 +440,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
         {
           ...slip,
           date: ctx.today,
+          dispatchSign: ctx.user.label,
           lines: slip.lines.map((l) => {
             // Pack size comes from the batch's own FG transfer, as on the screen.
             const tl = ctx.state.fgTransfers
@@ -430,7 +468,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
   gateOut: {
     perm: "gateout",
     args: z.tuple([docNo, sign, text(5)]),
-    prepare: ([id, s], ctx) => [id, s, ctx.now],
+    prepare: ([id], ctx) => [id, ctx.user.label, ctx.now],
   },
 
   addIndent: {
@@ -445,6 +483,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
         reason: text(200),
         supplierName: required(120),
         rate: z.number().positive("is required (₹ per unit)").max(10_000_000),
+        requestNo: z.string().trim().regex(/^IR-\d{8}-\d{4}$/).optional(),
       }),
     ]),
     prepare: ([i], ctx) => {
@@ -475,6 +514,7 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
           .max(100),
         expectedDate: dateLabel,
         indentIds: z.array(docNo).max(50),
+        gst: z.enum(["INTRA", "INTER"], "choose same state (CGST + SGST) or other state (IGST)"),
       }),
     ]),
     prepare: ([p], ctx) => {
@@ -495,6 +535,12 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
     args: z.tuple([docNo, text(80)]),
     // Signed with the identity of whoever is logged in — not whatever the client typed.
     prepare: ([id], ctx) => [id, ctx.user.label],
+  },
+
+  rejectPo: {
+    perm: "purchase.approve",
+    args: z.tuple([docNo, required(300), text(80)]),
+    prepare: ([id, reason], ctx) => [id, reason, ctx.user.label],
   },
 
   // Closing, reopening and the cut-over are dated and signed by the server.

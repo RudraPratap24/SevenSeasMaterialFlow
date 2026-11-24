@@ -1,9 +1,23 @@
 import { useMemo, useState } from "react";
+import { ClipboardCheck, PackageCheck, Truck, Warehouse } from "lucide-react";
 import { useAuth } from "../auth";
 import { todayLabel, useFlow } from "../store";
 import { Card, Chip, EmptyNote, Field, Table, Td, TextInput, Tr, fmt } from "../ui";
+import { FgTransferVerify } from "./FgTransferVerify";
+import { FgWarehouseStock } from "./FgWarehouseStock";
+import { CardFlow, type Node } from "./ProductionTab";
 
+/** FG Warehouse as cards. */
 export function FgTab({ onTraceBatch }: { onTraceBatch: (batch: string) => void }) {
+  const cards: Node[] = [
+    { title: "FG Transfer Verify", tone: "green", icon: ClipboardCheck, art: Truck, view: () => <FgTransferVerify /> },
+    { title: "FG Warehouse Stock", tone: "blue", icon: Warehouse, art: Warehouse, view: () => <FgWarehouseStock /> },
+    { title: "FG Receipt (current screen)", tone: "amber", icon: PackageCheck, art: PackageCheck, view: () => <FgReceipt onTraceBatch={onTraceBatch} /> },
+  ];
+  return <CardFlow root="FG Warehouse" top={cards} />;
+}
+
+function FgReceipt({ onTraceBatch }: { onTraceBatch: (batch: string) => void }) {
   const { state, fgStock, addFgTransfer, receiveFgTransfer, masters } = useFlow();
   const PRODUCTS = masters.products;
   const { can } = useAuth();

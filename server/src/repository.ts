@@ -15,8 +15,11 @@
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { DOC_COLLECTIONS, emptyState, FlowError, formatNo, numberTaken, SERIES, type DocCollection, type Series } from "../../src/flow/logic";
-import type {
+import type { GstType,
   ArRecord,
+  DebitNote,
+  EscalationClosure,
+  BomIssue,
   BomLine,
   ComponentInfo,
   CustOrder,
@@ -104,21 +107,33 @@ export async function getMastersVersion(db: Queryable): Promise<number> {
 
 export async function loadMasters(db: Queryable): Promise<MasterData> {
   const version = await getMastersVersion(db);
-  const components = (await rows(db, "SELECT code, name, type, unit FROM components WHERE active = 1 ORDER BY code")).map(
-    (r) => ({ code: str(r.code), name: str(r.name), type: str(r.type), unit: str(r.unit) }),
+  const components = (await rows(db, "SELECT code, name, type, unit, kind FROM components WHERE active = 1 ORDER BY code")).map(
+    (r) => ({ code: str(r.code), name: str(r.name), type: str(r.type), unit: str(r.unit), kind: str(r.kind) }),
   );
   const products = (
-    await rows(db, "SELECT id, name, fg_code, vendor, box_size FROM products WHERE active = 1 ORDER BY id")
-  ).map((r) => ({ id: num(r.id), name: str(r.name), fg: str(r.fg_code), vendor: str(r.vendor), boxSize: numOrNull(r.box_size) }));
+    await rows(db, "SELECT id, name, fg_code, category, vendor, box_size FROM products WHERE active = 1 ORDER BY id")
+  ).map((r) => ({
+    id: num(r.id),
+    name: str(r.name),
+    fg: str(r.fg_code),
+    category: str(r.category),
+    vendor: str(r.vendor),
+    boxSize: numOrNull(r.box_size),
+  }));
   const bomRows = await rows(
     db,
-    `SELECT p.name AS product, b.component_code, c.name AS component, b.per_100
+    `SELECT p.name AS product, b.component_code, c.name AS component, b.per_100, b.qty_source
        FROM bom_lines b JOIN products p ON p.id = b.product_id JOIN components c ON c.code = b.component_code
       ORDER BY p.id, b.component_code`,
   );
   const bom: Record<string, BomLine[]> = {};
   for (const r of bomRows) {
-    (bom[str(r.product)] ??= []).push({ n: str(r.component), c: str(r.component_code), p: Number(r.per_100) });
+    (bom[str(r.product)] ??= []).push({
+      n: str(r.component),
+      c: str(r.component_code),
+      p: Number(r.per_100),
+      ...(r.qty_source === "PACK" ? { d: true } : {}),
+    });
   }
   return {
     version,
@@ -188,7 +203,7 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
   s.indents = (
     await header(
       "indents",
-      `SELECT h.indent_no, h.indent_date, h.component_code, c.name AS component, h.qty, h.reason, h.po_no, h.rate_enc, s.name AS supplier
+      `SELECT h.indent_no, h.indent_date, h.component_code, c.name AS component, h.qty, h.reason, h.po_no, h.rate_enc, h.request_no, s.name AS supplier
          FROM purchase_indents h JOIN components c ON c.code = h.component_code
          LEFT JOIN suppliers s ON s.id = h.supplier_id /*WHERE*/ ORDER BY h.seq`,
     )
@@ -203,15 +218,17 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
       supplierName: str(r.supplier),
       rate: r.rate_enc ? Number(opened(r.rate_enc)) : null,
       status: r.po_no ? "PO_RAISED" : "OPEN",
+      ...(r.request_no ? { requestNo: str(r.request_no) } : {}),
     }),
   );
   const poRows = await header(
     "purchaseOrders",
     `SELECT h.po_no, h.po_date, s.name AS supplier, h.expected_date, h.approved_by, u.label AS approver,
+            h.rejected_at, rj.label AS rejecter, h.reject_reason, h.gst_type,
             DATE_FORMAT(h.tally_push_at, '%d-%m-%Y %H:%i') AS pushed_at, h.tally_push_error,
             (SELECT GROUP_CONCAT(x.indent_no ORDER BY x.seq) FROM purchase_indents x WHERE x.po_no = h.po_no) AS indent_ids
        FROM purchase_orders h JOIN suppliers s ON s.id = h.supplier_id
-       LEFT JOIN users u ON u.id = h.approved_by /*WHERE*/ ORDER BY h.seq`,
+       LEFT JOIN users u ON u.id = h.approved_by LEFT JOIN users rj ON rj.id = h.rejected_by /*WHERE*/ ORDER BY h.seq`,
   );
   const poLines = await linesOf(
     db,
@@ -233,8 +250,11 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
         rate: l.rate_enc ? Number(opened(l.rate_enc)) : null,
       })),
       expectedDate: fromSqlDate(r.expected_date),
-      status: r.approved_by !== null ? "APPROVED" : "PENDING_APPROVAL",
+      status: r.approved_by !== null ? "APPROVED" : r.rejected_at !== null ? "REJECTED" : "PENDING_APPROVAL",
       approvedBy: str(r.approver),
+      rejectedBy: str(r.rejecter),
+      rejectReason: str(r.reject_reason),
+      ...(r.gst_type ? { gst: r.gst_type as GstType } : {}),
       indentIds: r.indent_ids ? str(r.indent_ids).split(",") : [],
       tallyPushedAt: str(r.pushed_at),
       tallyError: str(r.tally_push_error),
@@ -284,7 +304,8 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
   /* inward */
   const gateRows = await header(
     "gateEntries",
-    "SELECT h.*, s.name AS supplier FROM gate_entries h JOIN suppliers s ON s.id = h.supplier_id /*WHERE*/ ORDER BY h.seq",
+    `SELECT h.*, s.name AS supplier, COALESCE(NULLIF(gu.full_name, ''), gu.label) AS guard, gu.username AS guard_login, EXISTS (SELECT 1 FROM gate_entry_photos p WHERE p.gate_entry_no = h.gate_entry_no) AS has_photo
+       FROM gate_entries h JOIN suppliers s ON s.id = h.supplier_id LEFT JOIN users gu ON gu.id = h.created_by /*WHERE*/ ORDER BY h.seq`,
   );
   const gateLines = await linesOf(
     db,
@@ -302,9 +323,12 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
       invoiceDate: fromSqlDate(r.invoice_date),
       poNo: str(r.po_no ?? r.tally_po_no ?? r.external_po_ref),
       invoiceQty: numOrNull(r.invoice_qty),
+      invoiceQtyUnit: str(r.invoice_qty_unit),
       transportName: str(r.transport_name),
       lrNo: opened(r.lr_no_enc),
       vehicleNo: opened(r.vehicle_no_enc),
+      driverName: str(r.driver_name),
+      driverPhone: opened(r.driver_phone_enc),
       timeIn: fromSqlTime(r.time_in),
       timeOut: fromSqlTime(r.time_out),
       driverSign: num(r.driver_signed) === 1,
@@ -316,13 +340,17 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
         qty: num(l.qty),
         remark: str(l.remark),
       })),
+      hasPhoto: num(r.has_photo) === 1,
+      guard: str(r.guard),
+      guardLogin: str(r.guard_login),
     }),
   );
   s.grnLines = (
     await header(
       "grnLines",
-      `SELECT h.*, c.name AS component, c.type AS ctype, g.po_no, g.external_po_ref, g.tally_po_no, g.invoice_no,
-              s.name AS supplier, loc.name AS location, v.qc_status
+      `SELECT h.*, c.name AS component, c.type AS ctype, g.po_no AS gate_po_no, g.external_po_ref AS gate_po_ref,
+              g.tally_po_no AS gate_tally_po_no, g.invoice_no,
+              s.name AS supplier, loc.name AS location, v.*
          FROM goods_receipts h
          JOIN components c ON c.code = h.component_code
          JOIN gate_entries g ON g.gate_entry_no = h.gate_entry_no
@@ -341,7 +369,8 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
       type: str(r.ctype),
       brandName: str(r.brand_name),
       receivedDate: fromSqlDate(r.received_date),
-      poNo: str(r.po_no ?? r.tally_po_no ?? r.external_po_ref),
+      // the PO Store picked at GRN, else (older GRNs) the one named at the gate
+      poNo: str(r.po_no ?? r.tally_po_no ?? r.gate_po_no ?? r.gate_tally_po_no ?? r.gate_po_ref),
       poQty: numOrNull(r.po_qty),
       invoiceNo: str(r.invoice_no),
       supplierName: str(r.supplier),
@@ -353,6 +382,12 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
       location: str(r.location),
       qcStatus: r.qc_status as GrnLine["qcStatus"],
       barcoded: num(r.barcoded) === 1,
+      acceptedQty: numOrNull(r.accepted_qty),
+      poItemName: str(r.po_item_name),
+      poItemCode: str(r.po_item_code),
+      pendingBefore: numOrNull(r.pending_before),
+      variance: str(r.variance) as GrnLine["variance"],
+      closesItem: num(r.closes_item) === 1,
     }),
   );
   s.qcIntimations = (
@@ -391,10 +426,96 @@ export async function loadState(db: Queryable, slice: Slice = "all"): Promise<Fl
       date: fromSqlDate(r.decided_on),
       status: r.status as ArRecord["status"],
       remark: str(r.remark),
+      acceptedQty: numOrNull(r.accepted_qty),
     }),
+  );
+  const dnRows = await header(
+    "debitNotes",
+    `SELECT h.*, r.component_code, c.name AS component, s.name AS supplier, g.invoice_no,
+            COALESCE(g.po_no, g.tally_po_no, g.external_po_ref) AS gate_po
+       FROM debit_notes h
+         JOIN goods_receipts r ON r.grn_no = h.grn_no
+         JOIN components c ON c.code = r.component_code
+         JOIN gate_entries g ON g.gate_entry_no = r.gate_entry_no
+       JOIN suppliers s ON s.id = g.supplier_id
+      /*WHERE*/ ORDER BY h.seq`,
+  );
+  // the PO Store picked at GRN (its own columns), else the gate's — asked only when there are notes to show
+  const grnPo = new Map<string, string>();
+  if (dnRows.length) {
+    const [pos] = await db.query<RowDataPacket[]>(
+      "SELECT grn_no, COALESCE(po_no, tally_po_no) AS po FROM goods_receipts WHERE grn_no IN (?)",
+      [dnRows.map((r) => str(r.grn_no))],
+    );
+    for (const x of pos) if (x.po) grnPo.set(str(x.grn_no), str(x.po));
+  }
+  s.debitNotes = dnRows.map((r): DebitNote => {
+    const qty = num(r.qty);
+    const rate = Number(opened(r.rate_enc));
+    return {
+      id: str(r.dn_no),
+      kind: str(r.kind) === "SHORT_SUPPLY" ? "SHORT_SUPPLY" : "QC_REJECTED",
+      date: fromSqlDate(r.dn_date),
+      grnNo: str(r.grn_no),
+      arNo: str(r.ar_no),
+      supplierName: str(r.supplier),
+      invoiceNo: str(r.invoice_no),
+      poNo: grnPo.get(str(r.grn_no)) ?? str(r.gate_po),
+      componentCode: str(r.component_code),
+      componentName: str(r.component),
+      qty,
+      unit: str(r.unit),
+      rate,
+      amount: Math.round(qty * rate * 100) / 100,
+      reason: str(r.reason),
+      raisedBy: str(r.raised_by),
+    };
+  });
+
+  s.escalationClosures = (await header("escalationClosures", "SELECT h.* FROM escalation_closures h /*WHERE*/ ORDER BY h.seq")).map(
+    (r): EscalationClosure => ({ grnNo: str(r.grn_no), date: fromSqlDate(r.closed_on), by: str(r.closed_by), resolution: str(r.resolution) }),
   );
 
   /* production */
+  const issueRows = await header("bomIssues", "SELECT h.* FROM bom_issue_slips h /*WHERE*/ ORDER BY h.seq");
+  const issueLines = await linesOf(
+    db,
+    `SELECT l.bom_no, l.component_code, c.name AS component, l.required_qty, l.issued_qty, l.remark
+       FROM bom_issue_lines l JOIN components c ON c.code = l.component_code
+      WHERE l.bom_no IN (?) ORDER BY l.bom_no, l.line_no`,
+    issueRows.map((r) => str(r.bom_no)),
+    "bom_no",
+  );
+  // what Store approved back from MRNs against each slip goes back into stock
+  const returnRows = await linesOf(
+    db,
+    `SELECT r.bom_no, l.component_code, SUM(l.received_qty) AS qty
+       FROM bom_returns r JOIN bom_return_lines l ON l.mrn_no = r.mrn_no
+      WHERE r.status = 'APPROVED' AND r.bom_no IN (?) GROUP BY r.bom_no, l.component_code`,
+    issueRows.map((r) => str(r.bom_no)),
+    "bom_no",
+  );
+  s.bomIssues = issueRows.map((r): BomIssue => {
+    const back = new Map((returnRows.get(str(r.bom_no)) ?? []).map((x) => [str(x.component_code), num(x.qty)]));
+    return {
+      bomNo: str(r.bom_no),
+      date: fromSqlDate(r.created_at),
+      filledBy: str(r.filled_by),
+      lines: (issueLines.get(str(r.bom_no)) ?? []).map((l) => {
+        const returnedQty = back.get(str(l.component_code));
+        back.delete(str(l.component_code)); // an item counts back once, even if listed twice
+        return {
+          componentCode: str(l.component_code),
+          componentName: str(l.component),
+          requiredQty: num(l.required_qty),
+          issuedQty: num(l.issued_qty),
+          remark: str(l.remark),
+          ...(returnedQty ? { returnedQty } : {}),
+        };
+      }),
+    };
+  });
+
   const mrnRows = await header("mrns", "SELECT h.* FROM material_returns h /*WHERE*/ ORDER BY h.seq");
   const mrnLines = await linesOf(
     db,
@@ -744,8 +865,11 @@ const DOC_ORDER = [
   "grnLines",
   "qcIntimations",
   "arRecords",
+  "debitNotes",
+  "escalationClosures",
   "requisitions",
   "mrns",
+  "bomIssues",
   "fgTransfers",
   "pdiRecords",
   "orders",
@@ -762,6 +886,9 @@ const KEY_OF: Record<DocKey, (d: never) => string> = {
   grnLines: (d: GrnLine) => d.grnNo,
   qcIntimations: (d: QcIntimation) => d.id,
   arRecords: (d: ArRecord) => d.arNo,
+  debitNotes: (d: DebitNote) => d.id,
+  escalationClosures: (d: EscalationClosure) => d.grnNo,
+  bomIssues: (d: BomIssue) => d.bomNo,
   requisitions: (d: Requisition) => d.id,
   mrns: (d: Mrn) => d.id,
   fgTransfers: (d: FgTransfer) => d.id,
@@ -776,6 +903,10 @@ export function countDocuments(state: FlowState): number {
 
 /** Children first: the order rows must be deleted in for a full replace. */
 const DELETE_ORDER = [
+  "bom_return_lines",
+  "bom_returns",
+  "bom_issue_lines",
+  "bom_issue_slips",
   "dispatch_lines",
   "dispatch_slips",
   "order_lines",
@@ -787,10 +918,13 @@ const DELETE_ORDER = [
   "material_returns",
   "requisition_lines",
   "requisitions",
+  "debit_notes",
+  "escalation_closures",
   "qc_results",
   "qc_intimations",
   "goods_receipts",
   "gate_entry_lines",
+  "gate_entry_photos",
   "gate_entries",
   "po_closures",
   "tally_po_lines",
@@ -833,13 +967,14 @@ class Writer {
     const approved = d.status === "APPROVED";
     const at = this.when(d.date);
     await this.exec(
-      `INSERT INTO purchase_orders (po_no, po_date, supplier_id, expected_date, approved_by, approved_at, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ${approved ? at.sql : "NULL"}, ?, ?)`,
+      `INSERT INTO purchase_orders (po_no, po_date, supplier_id, expected_date, gst_type, approved_by, approved_at, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ${approved ? at.sql : "NULL"}, ?, ?)`,
       [
         d.id,
         toSqlDate(d.date),
         await this.r.supplier(d.supplierName),
         toSqlDate(d.expectedDate),
+        d.gst ?? null,
         approved ? await this.r.approver(d.approvedBy) : null,
         ...(approved ? at.params : []),
         this.by,
@@ -861,8 +996,8 @@ class Writer {
 
   async indents(d: Indent) {
     await this.exec(
-      `INSERT INTO purchase_indents (indent_no, indent_date, component_code, qty, reason, supplier_id, rate_enc, po_no, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO purchase_indents (indent_no, indent_date, component_code, qty, reason, supplier_id, rate_enc, po_no, request_no, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         d.id,
         toSqlDate(d.date),
@@ -872,6 +1007,7 @@ class Writer {
         d.supplierName ? await this.r.supplier(d.supplierName) : null,
         d.rate === null || d.rate === undefined ? null : encryptValue(String(d.rate)),
         d.status === "PO_RAISED" ? this.poOfIndent(d.id) : null,
+        d.requestNo ?? null,
         this.by,
         this.by,
       ],
@@ -915,9 +1051,9 @@ class Writer {
     const inTally = !inSystem && d.poNo !== "" && this.after.tallyPos.some((p) => p.poNo === d.poNo);
     await this.exec(
       `INSERT INTO gate_entries (gate_entry_no, entry_date, supplier_id, product_desc, invoice_no, invoice_date, invoice_qty,
-         po_no, external_po_ref, tally_po_no, transport_name, lr_no_enc, vehicle_no_enc, time_in, time_out, driver_signed, remark,
-         created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         invoice_qty_unit, po_no, external_po_ref, tally_po_no, transport_name, lr_no_enc, vehicle_no_enc, driver_name,
+         driver_phone_enc, time_in, time_out, driver_signed, remark, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         d.id,
         toSqlDate(d.date),
@@ -926,12 +1062,15 @@ class Writer {
         d.invoiceNo,
         toSqlDate(d.invoiceDate),
         d.invoiceQty,
+        d.invoiceQtyUnit,
         inSystem ? d.poNo : null,
         !inSystem && !inTally && d.poNo ? d.poNo : null,
         inTally ? d.poNo : null,
         d.transportName,
         sealed(d.lrNo),
         sealed(d.vehicleNo),
+        d.driverName,
+        sealed(d.driverPhone),
         toSqlTime(d.timeIn),
         toSqlTime(d.timeOut),
         d.driverSign ? 1 : 0,
@@ -953,17 +1092,30 @@ class Writer {
     // The GRN carries supplier, invoice and PO only through its gate entry — refuse a disagreeing copy.
     const gate = this.after.gateEntries.find((g) => g.id === d.gateEntryId);
     if (!gate) throw new FlowError(`Gate entry ${d.gateEntryId} not found.`);
-    if (gate.supplierName !== d.supplierName || gate.invoiceNo !== d.invoiceNo || gate.poNo !== d.poNo) {
+    // (the PO: the gate entry's on older entries; picked by Store at GRN on manual gate entries)
+    if (gate.supplierName !== d.supplierName || gate.invoiceNo !== d.invoiceNo || (gate.poNo !== "" && gate.poNo !== d.poNo)) {
       throw new ConsistencyError(`GRN ${d.grnNo}: supplier/invoice/PO differ from gate entry ${gate.id}`);
     }
+    const ownPo = gate.poNo === "" && d.poItemName !== "";
+    const inSystem = ownPo && this.after.purchaseOrders.some((p) => p.id === d.poNo && p.status === "APPROVED" && !numberTaken(p));
+    const inTally = ownPo && !inSystem && this.after.tallyPos.some((p) => p.poNo === d.poNo);
+    if (ownPo && !inSystem && !inTally) throw new ConsistencyError(`GRN ${d.grnNo}: PO ${d.poNo} is not on file`);
     await this.exec(
-      `INSERT INTO goods_receipts (grn_no, gate_entry_no, gate_line_no, component_code, brand_name, received_date, po_qty,
+      `INSERT INTO goods_receipts (grn_no, gate_entry_no, gate_line_no, po_no, tally_po_no, po_item_name, po_item_code,
+         pending_before, variance, closes_item, component_code, brand_name, received_date, po_qty,
          qty_per_box, total_boxes, total_qty, unit, location_id, barcoded, remark_store, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         d.grnNo,
         d.gateEntryId,
         d.gateLineNo,
+        inSystem ? d.poNo : null,
+        inTally ? d.poNo : null,
+        d.poItemName,
+        d.poItemCode,
+        d.pendingBefore,
+        d.variance,
+        d.closesItem ? 1 : 0,
         d.componentCode,
         d.brandName,
         toSqlDate(d.receivedDate),
@@ -995,8 +1147,42 @@ class Writer {
 
   async arRecords(d: ArRecord) {
     await this.exec(
-      "INSERT INTO qc_results (ar_no, intimation_no, decided_on, status, remark, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [d.arNo, d.intimationId, toSqlDate(d.date), d.status, d.remark, this.by, this.by],
+      "INSERT INTO qc_results (ar_no, intimation_no, decided_on, status, remark, accepted_qty, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [d.arNo, d.intimationId, toSqlDate(d.date), d.status, d.remark, d.acceptedQty, this.by, this.by],
+    );
+  }
+
+  /** Only by a restore: live issue slips are written by the BOM issue route (it checks them against the BOM list). */
+  async bomIssues(d: BomIssue) {
+    await this.exec("INSERT INTO bom_issue_slips (bom_no, filled_by, created_by, updated_by) VALUES (?, ?, ?, ?)", [d.bomNo, d.filledBy, this.by, this.by]);
+    for (const [i, l] of d.lines.entries()) {
+      await this.exec(
+        "INSERT INTO bom_issue_lines (bom_no, line_no, component_code, required_qty, issued_qty, remark) VALUES (?, ?, ?, ?, ?, ?)",
+        [d.bomNo, i + 1, l.componentCode, l.requiredQty, l.issuedQty, l.remark],
+      );
+    }
+  }
+
+  async escalationClosures(d: EscalationClosure) {
+    await this.exec(
+      "INSERT INTO escalation_closures (grn_no, closed_on, closed_by, resolution, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?)",
+      [d.grnNo, toSqlDate(d.date), d.by, d.resolution, this.by, this.by],
+    );
+  }
+
+  async debitNotes(d: DebitNote) {
+    const grn = this.after.grnLines.find((g) => g.grnNo === d.grnNo);
+    if (d.kind === "SHORT_SUPPLY") {
+      // only a SHORT GRN can carry a short-supply note
+      if (!grn || grn.variance !== "SHORT") throw new ConsistencyError(`Debit note ${d.id}: GRN ${d.grnNo} is not a SHORT receipt`);
+    } else if (!grn || grn.acceptedQty === null || Math.abs(grn.totalQty - grn.acceptedQty - d.qty) > 0.0005 || grn.invoiceNo !== d.invoiceNo) {
+      // the quantity is the GRN's rejected part — refuse a copy that disagrees with QC's decision
+      throw new ConsistencyError(`Debit note ${d.id}: quantity differs from what QC rejected on GRN ${d.grnNo}`);
+    }
+    await this.exec(
+      `INSERT INTO debit_notes (dn_no, dn_date, grn_no, kind, ar_no, qty, unit, rate_enc, reason, raised_by, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [d.id, toSqlDate(d.date), d.grnNo, d.kind, d.arNo || null, d.qty, d.unit, encryptValue(String(d.rate)), d.reason, d.raisedBy, this.by, this.by],
     );
   }
 
@@ -1187,9 +1373,9 @@ class Writer {
       case "grnLines": {
         const a = after as GrnLine;
         await this.exec(
-          `UPDATE goods_receipts SET total_qty = ?, barcoded = ?, location_id = ?, remark_store = ?, updated_by = ?
-            WHERE grn_no = ?`,
-          [a.totalQty, a.barcoded ? 1 : 0, await this.r.location(a.location), a.remarkStore, this.by, a.grnNo],
+          `UPDATE goods_receipts SET total_qty = ?, variance = ?, closes_item = ?, barcoded = ?, location_id = ?, remark_store = ?,
+             updated_by = ? WHERE grn_no = ?`,
+          [a.totalQty, a.variance, a.closesItem ? 1 : 0, a.barcoded ? 1 : 0, await this.r.location(a.location), a.remarkStore, this.by, a.grnNo],
         );
         return; // qcStatus and the QC slip's qty follow automatically (computed)
       }
@@ -1262,6 +1448,14 @@ class Writer {
         if (b.status !== "APPROVED" && a.status === "APPROVED") {
           await this.exec("UPDATE purchase_orders SET approved_by = ?, approved_at = NOW(3), updated_by = ? WHERE po_no = ?", [
             await this.r.approver(a.approvedBy),
+            this.by,
+            a.id,
+          ]);
+        }
+        if (b.status !== "REJECTED" && a.status === "REJECTED") {
+          await this.exec("UPDATE purchase_orders SET rejected_by = ?, rejected_at = NOW(3), reject_reason = ?, updated_by = ? WHERE po_no = ?", [
+            await this.r.approver(a.rejectedBy ?? ""),
+            a.rejectReason ?? "",
             this.by,
             a.id,
           ]);
@@ -1401,6 +1595,11 @@ async function stampVersion(conn: Conn, touched: Map<DocCollection, Set<string>>
   }
 }
 
+/** Marks one document changed (e.g. its photo arrived), so every open screen picks it up. Caller's transaction. */
+export async function touchDocument(conn: Conn, c: DocCollection, key: string): Promise<void> {
+  await stampVersion(conn, new Map([[c, new Set([key])]]), false);
+}
+
 /**
  * Gives a PO a new number. Its lines and indents follow (ON UPDATE CASCADE; callers refuse a PO with gate entries,
  * whose link does not follow); the stage lock lets the
@@ -1433,6 +1632,7 @@ export async function seedSequences(conn: Conn, state: FlowState): Promise<void>
     GR: state.grnLines.map((x) => x.grnNo),
     QCI: state.qcIntimations.map((x) => x.id),
     AR: state.arRecords.map((x) => x.arNo),
+    DN: state.debitNotes.map((x) => x.id),
     REQ: state.requisitions.map((x) => x.id),
     MRN: state.mrns.map((x) => x.id),
     FGT: state.fgTransfers.map((x) => x.id),
@@ -1515,9 +1715,29 @@ export async function loadSnapshot(db: Queryable, id: number): Promise<FlowState
     ...s,
     tallyPos: (s.tallyPos ?? []).map((p) => ({ ...p, guid: p.guid ?? "", alterId: p.alterId ?? 0 })),
     poClosures: s.poClosures ?? [],
+    debitNotes: s.debitNotes ?? [],
+    escalationClosures: s.escalationClosures ?? [],
+    bomIssues: s.bomIssues ?? [],
+    arRecords: s.arRecords.map((a) => ({ ...a, acceptedQty: a.acceptedQty ?? null })),
+    grnLines: s.grnLines.map((g) => ({
+      ...g,
+      acceptedQty: g.acceptedQty ?? null,
+      poItemName: g.poItemName ?? "",
+      poItemCode: g.poItemCode ?? "",
+      pendingBefore: g.pendingBefore ?? null,
+      variance: g.variance ?? "",
+      closesItem: g.closesItem ?? false,
+    })),
     indents: s.indents.map((i) => ({ ...i, rate: i.rate ?? null })),
     purchaseOrders: s.purchaseOrders.map((p) => ({ ...p, tallyPushedAt: p.tallyPushedAt ?? "", tallyError: p.tallyError ?? "" })),
-    gateEntries: s.gateEntries.map((g) => ({ ...g, lines: g.lines ?? [] })),
+    gateEntries: s.gateEntries.map((g) => ({
+      ...g,
+      lines: g.lines ?? [],
+      invoiceQtyUnit: g.invoiceQtyUnit ?? "",
+      driverName: g.driverName ?? "",
+      driverPhone: g.driverPhone ?? "",
+      hasPhoto: g.hasPhoto ?? false,
+    })),
   };
 }
 
@@ -1526,14 +1746,16 @@ export async function loadSnapshot(db: Queryable, id: number): Promise<FlowState
 export async function loadSuppliers(db: Queryable): Promise<Supplier[]> {
   const list = await rows(db, "SELECT id, name, city, from_tally FROM suppliers WHERE active = 1 AND approved = 1 ORDER BY id");
   const rates = groupBy(await rows(db, "SELECT supplier_id, component_code, rate_enc FROM supplier_rates"), "supplier_id");
-  return list.map((s) => ({
-    name: str(s.name),
-    city: str(s.city),
-    fromTally: num(s.from_tally) === 1,
-    rates: Object.fromEntries(
-      (rates.get(str(s.id)) ?? []).map((r) => [str(r.component_code), Number(opened(r.rate_enc))]),
-    ),
-  }));
+  return list.map((s) => {
+    const mine = rates.get(str(s.id)) ?? [];
+    return {
+      name: str(s.name),
+      city: str(s.city),
+      fromTally: num(s.from_tally) === 1,
+      rates: Object.fromEntries(mine.filter((r) => r.rate_enc !== null).map((r) => [str(r.component_code), Number(opened(r.rate_enc))])),
+      supplies: mine.filter((r) => r.rate_enc === null).map((r) => str(r.component_code)),
+    };
+  });
 }
 
 /* ── customer master ────────────────────────────────────────────────────────── */

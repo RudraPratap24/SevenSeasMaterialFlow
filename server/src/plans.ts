@@ -12,7 +12,7 @@
  *   series   the document number series it creates in.
  */
 import type { RowDataPacket } from "mysql2/promise";
-import type { ActionName, DocCollection, Series } from "../../src/flow/logic";
+import { FlowError, type ActionName, type DocCollection, type Series } from "../../src/flow/logic";
 import type { Queryable } from "./db";
 import { toSqlDate, type Slice } from "./repository";
 
@@ -34,13 +34,14 @@ async function col(db: Queryable, sql: string, params: unknown[]): Promise<strin
 }
 
 /** Everything the store-stock rule needs for these components. */
-function stockSlice(codes: string[]): Exclude<Slice, "all"> {
+export function stockSlice(codes: string[]): Exclude<Slice, "all"> {
   if (codes.length === 0) return {};
   return {
     stockCodes: codes,
     grnLines: { sql: "h.component_code IN (?)", params: [codes] },
     requisitions: { sql: "h.req_no IN (SELECT req_no FROM requisition_lines WHERE component_code IN (?))", params: [codes] },
     mrns: { sql: "h.mrn_no IN (SELECT mrn_no FROM material_return_lines WHERE component_code IN (?))", params: [codes] },
+    bomIssues: { sql: "h.bom_no IN (SELECT bom_no FROM bom_issue_lines WHERE component_code IN (?))", params: [codes] },
   };
 }
 
@@ -75,33 +76,12 @@ const grnPlan = (grnNo: string): Plan => ({
 
 export const PLANS: Record<ActionName, Planner> = {
   addGateEntry: async ([e]) => {
-    const { poNo, invoiceNo } = e as { poNo: string; invoiceNo: string };
-    const gate: string[] = [];
-    const params: unknown[] = [];
-    if (invoiceNo) {
-      gate.push("h.invoice_no = ?"); // duplicate-invoice check
-      params.push(invoiceNo);
-    }
-    if (poNo) {
-      gate.push("h.tally_po_no = ? OR h.po_no = ?"); // what has already come in against the PO
-      params.push(poNo, poNo);
-    }
+    const { invoiceNo } = e as { invoiceNo: string };
     return {
       targets: [],
-      // Two vehicles for the same PO, or one invoice entered twice at once, are checked one after the other.
-      locks: [...(poNo ? [`tally-po:${poNo}`] : []), ...(invoiceNo ? [`gate-invoice:${invoiceNo.toLowerCase()}`] : [])],
-      slice: {
-        gateEntries: gate.length ? { sql: gate.join(" OR "), params } : none,
-        // Store's GRN counts replace the gate quantities in what the PO has received.
-        ...(poNo
-          ? {
-              tallyPos: eq("po_no", poNo),
-              purchaseOrders: eq("po_no", poNo),
-              poClosures: eq("po_no", poNo),
-              grnLines: { sql: "g.tally_po_no = ? OR g.po_no = ?", params: [poNo, poNo] },
-            }
-          : {}),
-      },
+      // One invoice entered twice at once is checked one after the other.
+      locks: invoiceNo ? [`gate-invoice:${invoiceNo.toLowerCase()}`] : [],
+      slice: { gateEntries: invoiceNo ? { sql: "h.invoice_no = ?", params: [invoiceNo] } : none },
       series: "GE",
     };
   },
@@ -113,16 +93,23 @@ export const PLANS: Record<ActionName, Planner> = {
   }),
 
   addGrnLine: async ([l]) => {
-    const gateEntryId = (l as { gateEntryId: string }).gateEntryId;
+    const { gateEntryId, poNo } = l as { gateEntryId: string; poNo: string };
+    // the PO of the GRN: Store's pick, or (older gate entries) the one the gate named
+    const po = "COALESCE(NULLIF(?, ''), (SELECT COALESCE(po_no, tally_po_no) FROM gate_entries WHERE gate_entry_no = ?))";
     return {
       targets: [],
-      // Two clerks making a GRN for the same gate-checked item: the second one sees the first.
-      locks: [`gate-grn:${gateEntryId}`],
+      // Two clerks counting against the same PO (or the same gate-checked item): the second one sees the first.
+      locks: [`gate-grn:${gateEntryId}`, ...(poNo ? [`po-grn:${poNo}`] : [])],
       slice: {
-        gateEntries: eq("gate_entry_no", gateEntryId),
-        grnLines: eq("gate_entry_no", gateEntryId),
-        tallyPos: { sql: "h.po_no = (SELECT tally_po_no FROM gate_entries WHERE gate_entry_no = ?)", params: [gateEntryId] },
-        purchaseOrders: { sql: "h.po_no = (SELECT po_no FROM gate_entries WHERE gate_entry_no = ?)", params: [gateEntryId] },
+        // the gate entry, and everything already received against the PO (pending = ordered − received)
+        gateEntries: { sql: `h.gate_entry_no = ? OR h.po_no = ${po} OR h.tally_po_no = ${po}`, params: [gateEntryId, poNo, gateEntryId, poNo, gateEntryId] },
+        grnLines: {
+          sql: `h.gate_entry_no = ? OR h.po_no = ${po} OR h.tally_po_no = ${po} OR g.po_no = ${po} OR g.tally_po_no = ${po}`,
+          params: [gateEntryId, poNo, gateEntryId, poNo, gateEntryId, poNo, gateEntryId, poNo, gateEntryId],
+        },
+        tallyPos: { sql: `h.po_no = ${po}`, params: [poNo, gateEntryId] },
+        purchaseOrders: { sql: `h.po_no = ${po}`, params: [poNo, gateEntryId] },
+        poClosures: { sql: `h.po_no = ${po}`, params: [poNo, gateEntryId] },
       },
       series: "GR",
     };
@@ -135,6 +122,40 @@ export const PLANS: Record<ActionName, Planner> = {
     return { ...p, slice: { ...p.slice, gateEntries: gate } };
   },
   setBarcoded: async ([grnNo]) => grnPlan(String(grnNo)),
+  closeEscalation: async ([grnNo]) => ({
+    targets: [],
+    locks: [`escalation:${String(grnNo)}`],
+    slice: { grnLines: eq("grn_no", grnNo), escalationClosures: eq("grn_no", grnNo) },
+  }),
+  escalationDebitNote: async ([d]) => {
+    const grnNo = (d as { grnNo: string }).grnNo;
+    return {
+      targets: [],
+      locks: [`escalation:${grnNo}`, `debit-note:${grnNo}`],
+      slice: { grnLines: eq("grn_no", grnNo), escalationClosures: eq("grn_no", grnNo), debitNotes: eq("grn_no", grnNo) },
+      series: "DN",
+    };
+  },
+  escalationIndent: async ([d]) => {
+    const grnNo = (d as { grnNo: string }).grnNo;
+    return { targets: [], locks: [`escalation:${grnNo}`], slice: { grnLines: eq("grn_no", grnNo), escalationClosures: eq("grn_no", grnNo) }, series: "IND" };
+  },
+  addDebitNote: async ([d]) => {
+    const grnNo = (d as { grnNo: string }).grnNo;
+    const p = grnPlan(grnNo);
+    return {
+      ...p,
+      targets: [],
+      // one debit note per GRN, even when two screens raise it at once
+      locks: [`debit-note:${grnNo}`],
+      slice: {
+        ...p.slice,
+        arRecords: { sql: "h.intimation_no IN (SELECT intimation_no FROM qc_intimations WHERE grn_no = ?)", params: [grnNo] },
+        debitNotes: eq("grn_no", grnNo),
+      },
+      series: "DN",
+    };
+  },
   sendToQc: async ([grnNo]) => ({ ...grnPlan(String(grnNo)), series: "QCI" }),
 
   recordAr: async ([intimationId], db) => {
@@ -219,7 +240,15 @@ export const PLANS: Record<ActionName, Planner> = {
     slice: { dispatchSlips: eq("dispatch_no", id) },
   }),
 
-  addIndent: async () => ({ targets: [], locks: [], slice: {}, series: "IND" }),
+  addIndent: async ([i], db) => {
+    const requestNo = (i as { requestNo?: string }).requestNo;
+    if (!requestNo) return { targets: [], locks: [], slice: {}, series: "IND" };
+    // only a request Store verified can become an indent (verify never goes back, so checking before the lock is safe)
+    const status = await col(db, "SELECT status FROM indent_requests WHERE request_no = ?", [requestNo]);
+    if (status[0] !== "VERIFIED") throw new FlowError(`Indent request ${requestNo} is not verified by Store.`);
+    // its indent, if any, loaded under the lock: the rule refuses a second one
+    return { targets: [], locks: [`indentreq:${requestNo}`], slice: { indents: eq("request_no", requestNo) }, series: "IND" };
+  },
 
   raisePo: async ([p]) => {
     const ids = (p as { indentIds: string[] }).indentIds;
@@ -237,6 +266,13 @@ export const PLANS: Record<ActionName, Planner> = {
     slice: { purchaseOrders: eq("po_no", id) },
   }),
 
+  rejectPo: async ([id]) => ({
+    targets: [{ c: "purchaseOrders", key: String(id) }],
+    locks: [],
+    // its indents go back to open
+    slice: { purchaseOrders: eq("po_no", id), indents: eq("po_no", id) },
+  }),
+
   closePo: async ([po]) => poClosurePlan(String(po)),
   reopenPo: async ([po]) => poClosurePlan(String(po)),
 
@@ -251,7 +287,8 @@ export const PLANS: Record<ActionName, Planner> = {
         purchaseOrders: { sql: "h.po_date < ?", params: [day] },
         poClosures: { sql: "1 = 1", params: [] },
         gateEntries: { sql: "h.tally_po_no IS NOT NULL OR h.po_no IS NOT NULL", params: [] },
-        grnLines: { sql: "g.tally_po_no IS NOT NULL OR g.po_no IS NOT NULL", params: [] },
+        // receipts against a PO: GRNs that name it (Store's pick), and older ones through their gate entry
+        grnLines: { sql: "h.tally_po_no IS NOT NULL OR h.po_no IS NOT NULL OR g.tally_po_no IS NOT NULL OR g.po_no IS NOT NULL", params: [] },
       },
     };
   },
