@@ -2,20 +2,18 @@
  * One-time (and re-runnable) database setup, using the admin account from .env:
  *   1. creates the database (utf8mb4),
  *   2. applies pending schema migrations,
- *   3. creates the least-privilege app account the server runs as,
- *   4. loads the supplier price master (rates encrypted),
- *   5. creates one login per department if there are no users yet.
+ *      (an empty database starts from baseline.sql = old migrations 1–43, then the newer ones),
+ *   3. creates the least-privilege app account the server runs as (core + every module's grants),
+ *   4. creates the `admin` login if there are no users yet (everyone else is added on the admin page).
  *
- *   npm run db:setup                     → random passwords, printed once, must be changed on first login
- *   npm run db:setup -- --dev-passwords  → seven@<department> (local development only)
+ *   npm run db:setup                     → random admin password, printed once, must be changed on first login
+ *   npm run db:setup -- --dev-passwords  → seven@admin (local development only)
  */
 import mysql, { type RowDataPacket } from "mysql2/promise";
-import { ROLES, ROLE_PROFILES } from "../../src/flow/perms";
 import { config, isProd } from "../src/config";
-import { encryptValue, generatePassword, hashPassword } from "../src/crypto";
-import { MIGRATIONS, appGrants } from "../src/schema";
-import { installStageLocks } from "../src/stageLocks";
-import { SEED_SUPPLIERS } from "../seed/suppliers";
+import { generatePassword, hashPassword } from "../src/crypto";
+import { ROLE_LABELS } from "../src/roles";
+import { BASELINE_VERSION, MIGRATIONS, appGrants, baselineStatements } from "../src/schema";
 
 const devPasswords = process.argv.includes("--dev-passwords");
 if (devPasswords && isProd) {
@@ -53,6 +51,16 @@ async function main() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
     const [applied] = await admin.query<RowDataPacket[]>("SELECT version FROM schema_migrations");
     const done = new Set(applied.map((r) => Number(r.version)));
+    if (done.size === 0) {
+      const [tables] = await admin.query<RowDataPacket[]>("SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = ? AND table_name <> 'schema_migrations'", [db]);
+      if (Number(tables[0].n) > 0) throw new Error(`${db} has tables but no migration record — not touching it.`);
+      for (const sql of baselineStatements()) await admin.query(sql);
+      for (let v = 1; v <= BASELINE_VERSION; v++) {
+        await admin.query("INSERT INTO schema_migrations (version, name) VALUES (?, ?)", [v, "baseline"]);
+        done.add(v);
+      }
+      console.log(`Created the schema from baseline.sql (migrations 1–${BASELINE_VERSION}).`);
+    }
     for (const m of MIGRATIONS) {
       if (done.has(m.version)) continue;
       for (const sql of m.statements) await admin.query(sql);
@@ -60,10 +68,6 @@ async function main() {
       await admin.query("INSERT INTO schema_migrations (version, name) VALUES (?, ?)", [m.version, m.name]);
       console.log(`Applied migration ${m.version}: ${m.name}`);
     }
-
-    // Stage locks follow the current table definitions — re-installed on every setup.
-    await installStageLocks(admin);
-    console.log("Stage locks installed (passed stages cannot be altered; registers cannot be deleted).");
 
     // ── least-privilege app account ───────────────────────────────────────────
     if (config.DB_USER === adminUser) {
@@ -78,53 +82,27 @@ async function main() {
         await admin.query("ALTER USER ?@? IDENTIFIED BY ?", [config.DB_USER, host, config.DB_PASSWORD]);
         // Start from nothing, then grant table by table.
         await admin.query("REVOKE ALL PRIVILEGES, GRANT OPTION FROM ?@?", [config.DB_USER, host]);
-        for (const g of appGrants(config.ALLOW_DEMO_RESET)) {
+        for (const g of appGrants()) {
           await admin.query(`GRANT ${g.privileges} ON ${q(db)}.${q(g.table)} TO ?@?`, [config.DB_USER, host]);
         }
-        console.log(
-          `App account ${config.DB_USER}@${host} ready (table-level privileges only; ` +
-            `${config.ALLOW_DEMO_RESET ? "DELETE allowed for the demo reset" : "no DELETE on registers"}).`,
-        );
+        console.log(`App account ${config.DB_USER}@${host} ready (table-level privileges only).`);
       }
     }
 
-    // ── supplier price master ─────────────────────────────────────────────────
-    const [supCount] = await admin.query<RowDataPacket[]>("SELECT COUNT(*) AS n FROM suppliers");
-    if (Number(supCount[0].n) === 0) {
-      for (const s of SEED_SUPPLIERS) {
-        const [r] = await admin.query<import("mysql2/promise").ResultSetHeader>(
-          "INSERT INTO suppliers (name, city, approved) VALUES (?, ?, 1)",
-          [s.name, s.city],
-        );
-        for (const [code, rate] of Object.entries(s.rates)) {
-          await admin.query("INSERT INTO supplier_rates (supplier_id, component_code, rate_enc) VALUES (?, ?, ?)", [
-            r.insertId,
-            code,
-            encryptValue(String(rate)),
-          ]);
-        }
-      }
-      console.log(`Loaded ${SEED_SUPPLIERS.length} suppliers (rates encrypted).`);
-    }
-
-    // ── department logins ─────────────────────────────────────────────────────
+    // ── first login ───────────────────────────────────────────────────────────
     const [userCount] = await admin.query<RowDataPacket[]>("SELECT COUNT(*) AS n FROM users");
     if (Number(userCount[0].n) === 0) {
-      const created: { username: string; password: string }[] = [];
-      for (const role of ROLES) {
-        const password = devPasswords ? `seven@${role}` : generatePassword();
-        await admin.query(
-          "INSERT INTO users (username, password_hash, role, label, must_change_password) VALUES (?, ?, ?, ?, ?)",
-          [role, await hashPassword(password), role, ROLE_PROFILES[role].label, devPasswords ? 0 : 1],
-        );
-        created.push({ username: role, password });
-      }
-      console.log("\nDepartment logins created:");
-      for (const c of created) console.log(`  ${c.username.padEnd(10)} ${c.password}`);
+      const password = devPasswords ? "seven@admin" : generatePassword();
+      await admin.query(
+        "INSERT INTO users (username, password_hash, role, label, must_change_password) VALUES ('admin', ?, 'admin', ?, ?)",
+        [await hashPassword(password), ROLE_LABELS.admin, devPasswords ? 0 : 1],
+      );
+      console.log(`
+Login created:  admin  ${password}`);
       console.log(
         devPasswords
-          ? "\nDEV PASSWORDS — for local testing only. Never use these on a live server."
-          : "\nThese temporary passwords are shown ONCE. Hand each to its department; each must set a new one at first login.",
+          ? "DEV PASSWORD — for local testing only. Never use it on a live server."
+          : "Shown ONCE. Set a new one at first login, then add everyone else on the admin page (/admin).",
       );
     } else {
       console.log("Users already exist — left unchanged (use npm run user -- … to manage them).");

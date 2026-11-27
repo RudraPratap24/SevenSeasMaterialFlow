@@ -9,4 +9,7 @@ dist-server
 
 # client documents — kept local, not published
 reference-materials/
+# a module's client files: only the page is code; the sheet, its exports and Code.gs (staff emails) stay local
+modules/*/source/*
+!modules/*/source/Index.html
 __MACOSX/

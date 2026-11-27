@@ -1,13 +1,14 @@
 import cookieParser from "cookie-parser";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import express, { type NextFunction, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { authRouter } from "./authRoutes";
 import { config, isProd } from "./config";
-import { customerRouter } from "./customerRoutes";
-import { flowRouter } from "./flowRoutes";
+import { adminRouter } from "./admin/routes";
+import { callRouter, pageHandler, shimHandler } from "./gas/bridge";
+import { MODULES } from "./modules";
 import { loadSession } from "./sessions";
 
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -75,7 +76,8 @@ export function createApp() {
           "default-src": ["'self'"],
           "script-src": ["'self'"],
           "style-src": ["'self'", "'unsafe-inline'"],
-          "img-src": ["'self'", "data:"],
+          // item photos on the admin page are shown from Google Drive (the old photos live there)
+          "img-src": ["'self'", "data:", "https://drive.google.com", "https://*.googleusercontent.com"],
           "connect-src": ["'self'"],
           "font-src": ["'self'"],
           "object-src": ["'none'"],
@@ -91,7 +93,7 @@ export function createApp() {
     }),
   );
   app.use((_req, res, next) => {
-    // the gate takes one photo per vehicle with this site's own pages; nothing else may use the camera
+    // module pages may take photos on this site; no other site may use the camera
     res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=(), payment=()");
     next();
   });
@@ -112,7 +114,10 @@ export function createApp() {
       message: { error: "Too many requests — slow down a little." },
     }),
   );
-  api.use(express.json({ limit: "200kb", strict: true, type: "application/json" }));
+  const json = express.json({ limit: "200kb", strict: true, type: "application/json" });
+  // module calls parse their own bodies (a module may allow photo uploads)
+  const callPath = new RegExp(`^/(${MODULES.map((m) => m.id).join("|")})/call/`);
+  api.use((req, res, next) => (callPath.test(req.path) ? next() : json(req, res, next)));
   api.use(cookieParser());
   api.use(csrfGuard);
   api.use(loadSession);
@@ -121,34 +126,33 @@ export function createApp() {
     res.json({ ok: true });
   });
   api.use("/auth", authRouter);
-  api.use("/customers", customerRouter);
-  api.use("/", flowRouter);
+  api.use("/admin", adminRouter);
+  for (const m of MODULES) api.use("/" + m.id, callRouter(m));
   api.use((_req, res) => {
     res.status(404).json({ error: "Not found." });
   });
 
   app.use("/api", api);
-
-  // Production: the same server hosts the built frontend — one origin, no CORS needed.
-  const dist = path.resolve(process.cwd(), "dist");
-  if (existsSync(path.join(dist, "index.html"))) {
-    app.use(
-      express.static(dist, {
-        index: false,
-        setHeaders(res, file) {
-          res.setHeader(
-            "Cache-Control",
-            file.includes(`${path.sep}assets${path.sep}`) ? "public, max-age=31536000, immutable" : "no-cache",
-          );
-        },
-      }),
-    );
-    // The app is one page (tabs switch inside it): only "/" serves it — any other path is a plain 404, not the page.
-    app.get(["/", "/index.html"], (_req, res) => {
-      res.setHeader("Cache-Control", "no-cache");
-      res.sendFile(path.join(dist, "index.html"));
-    });
-  }
+  app.get("/gas/shim.js", shimHandler);
+  // the admin page (masters and users): a plain page under the main strict security policy
+  const adminFile = (f: string) => readFileSync(path.resolve(process.cwd(), "server/src/admin", f), "utf8");
+  app.get("/admin", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
+    res.type("html").send(adminFile("page.html"));
+  });
+  app.get("/admin/admin.js", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
+    res.type("application/javascript").send(adminFile("admin.js"));
+  });
+  for (const m of MODULES) app.get("/" + m.id, pageHandler(m));
+  // the front door: a link to each module
+  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  const home = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Seven Seas</title>
+<body style="font-family:system-ui,sans-serif;max-width:520px;margin:48px auto;padding:0 16px"><h1>Seven Seas</h1><ul>${MODULES.map((m) => `<li><a href="/${m.id}">${esc(m.title)}</a></li>`).join("")}<li><a href="/admin">Admin (users, items, vendors)</a></li></ul></body>`;
+  app.get(["/", "/index.html"], (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
+    res.type("html").send(home);
+  });
   app.use((_req, res) => {
     res.status(404).type("text/plain").send("Not found");
   });

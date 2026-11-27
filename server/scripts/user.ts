@@ -9,7 +9,7 @@
  *   npm run user -- unlock <login-id>       clears a lockout after wrong passwords
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import { ROLES, ROLE_PROFILES, type Role } from "../../src/flow/perms";
+import { ROLE_LABELS, ROLES, type Role } from "../src/roles";
 import { generatePassword, hashPassword } from "../src/crypto";
 import { pool } from "../src/db";
 
@@ -60,7 +60,7 @@ async function main() {
       const password = generatePassword();
       await pool.execute(
         "INSERT INTO users (username, password_hash, role, label, full_name, must_change_password) VALUES (?, ?, ?, ?, ?, 1)",
-        [id, await hashPassword(password), role, (labelArg ?? ROLE_PROFILES[role].label).slice(0, 80), (nameArg ?? "").trim().slice(0, 80)],
+        [id, await hashPassword(password), role, (labelArg ?? ROLE_LABELS[role]).slice(0, 80), (nameArg ?? "").trim().slice(0, 80)],
       );
       await cliAudit("user.create", id);
       console.log(`Created ${id} (${role}). Temporary password: ${password}`);

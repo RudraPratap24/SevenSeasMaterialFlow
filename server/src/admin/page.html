@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seven Seas Admin</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --mute:#667085; --line:#e3e6eb; --brand:#3b1670; --bad:#b42318; --ok:#067647; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; gap:12px; align-items:center; padding:10px 16px; background:var(--brand); color:#fff; flex-wrap:wrap; }
+  header b { margin-right:auto; }
+  header button { background:transparent; color:#fff; border:1px solid #ffffff66; }
+  nav { display:flex; gap:4px; padding:8px 16px 0; flex-wrap:wrap; }
+  nav button.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+  main { padding:12px 16px 40px; max-width:1200px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:12px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  input, select, textarea { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; color:inherit; min-width:0; }
+  button { font:inherit; padding:6px 12px; border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; }
+  button.primary { background:var(--brand); color:#fff; border-color:var(--brand); }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--mute); font-weight:600; font-size:12px; }
+  tbody tr { cursor:pointer; } tbody tr:hover { background:#f2f0f8; }
+  .wrap { overflow-x:auto; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; }
+  .grid label { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--mute); }
+  .msg { min-height:20px; } .bad { color:var(--bad); } .good { color:var(--ok); } .mute { color:var(--mute); }
+  .hidden { display:none !important; }
+  #login { max-width:340px; margin:60px auto; }
+  #login label { display:block; margin-bottom:10px; } #login input { width:100%; }
+</style>
+</head>
+<body>
+<header><b>Seven Seas · Admin</b><span id="who"></span><button id="logout" class="hidden" type="button">Log out</button></header>
+
+<section id="login" class="card hidden">
+  <h2 id="loginTitle">Log in</h2>
+  <form id="loginForm">
+    <label>Login <input name="username" autocomplete="username" required></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+    <button class="primary" type="submit">Log in</button>
+  </form>
+  <form id="changeForm" class="hidden">
+    <p class="mute">Set your own password (10+ characters, mix of letters, digits, symbols).</p>
+    <label>Current password <input name="currentPassword" type="password" autocomplete="current-password" required></label>
+    <label>New password <input name="newPassword" type="password" autocomplete="new-password" required></label>
+    <button class="primary" type="submit">Save password</button>
+  </form>
+  <p class="msg bad" id="loginMsg"></p>
+</section>
+
+<div id="app" class="hidden">
+  <nav id="tabs"></nav>
+  <main>
+    <div class="card">
+      <div class="row">
+        <input id="search" type="search" placeholder="Search…" aria-label="Search">
+        <button id="add" class="primary" type="button">Add</button>
+        <span class="mute" id="count"></span>
+        <span style="margin-left:auto"><button id="prev" type="button">Prev</button> <button id="next" type="button">Next</button></span>
+      </div>
+      <div class="wrap"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
+    </div>
+    <div class="card hidden" id="editor">
+      <h3 id="editTitle"></h3>
+      <form id="editForm"><div class="grid" id="fields"></div>
+        <div class="row" style="margin-top:12px"><button class="primary" type="submit">Save</button><button type="button" id="cancel">Close</button><span id="extra"></span></div>
+      </form>
+      <p class="msg" id="editMsg"></p>
+      <div id="rates" class="hidden">
+        <h4>Vendors for this item</h4>
+        <div class="wrap"><table><thead><tr><th>Vendor</th><th>Code</th><th>Vendor's item name</th><th>Rate</th><th></th></tr></thead><tbody id="rateBody"></tbody></table></div>
+        <form id="rateForm" class="row" style="margin-top:8px">
+          <input name="vendor" list="vendorList" placeholder="Vendor name or code" required>
+          <datalist id="vendorList"></datalist>
+          <input name="vendorItem" placeholder="Vendor's item name">
+          <input name="rate" placeholder="Rate (empty = no fixed rate)" inputmode="decimal">
+          <button type="submit">Save vendor</button>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="/admin/admin.js"></script>
+</body>
+</html>

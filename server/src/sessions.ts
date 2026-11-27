@@ -1,6 +1,6 @@
 import type { CookieOptions, NextFunction, Request, Response } from "express";
 import type { RowDataPacket } from "mysql2/promise";
-import { ROLE_PROFILES, type Role } from "../../src/flow/perms";
+import type { Role } from "./roles";
 import { config, isProd } from "./config";
 import { hashToken, newToken } from "./crypto";
 import { pool } from "./db";
@@ -126,14 +126,11 @@ export function requirePasswordCurrent(req: Request, res: Response, next: NextFu
 }
 
 export function publicUser(u: SessionUser) {
-  const profile = ROLE_PROFILES[u.role];
   return {
     username: u.username,
     role: u.role,
     label: u.label,
     name: u.name,
-    tabs: profile.tabs,
-    viewOnly: profile.viewOnly,
     mustChangePassword: u.mustChangePassword,
   };
 }

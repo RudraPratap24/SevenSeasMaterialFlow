@@ -44,6 +44,8 @@ const schema = z.object({
   TALLY_ALLOW_WRITE: bool.default(false),
   /** Test copies only: TallyPrime's Educational mode takes vouchers dated the 1st or 2nd — e.g. 20261001. */
   TALLY_TEST_DATE: z.string().regex(/^(\d{8})?$/, "must be yyyymmdd").default(""),
+  /** Read Purchase Orders from Tally in the sync. Off for now (items and vendors are still synced). */
+  TALLY_SYNC_POS: bool.default(false),
   /** How often `npm run tally -- watch` syncs, in seconds. */
   TALLY_SYNC_SECONDS: z.coerce.number().int().min(10).max(3600).default(30),
   /** Names of the client's Purchase Order voucher types in Tally (comma-separated). */

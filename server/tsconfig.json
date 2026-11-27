@@ -22,9 +22,6 @@
   "include": [
     "src",
     "scripts",
-    "seed",
-    "../src/flow/logic.ts",
-    "../src/flow/perms.ts",
-    "../src/flow/types.ts"
+    "../modules/*/server"
   ]
 }

@@ -1,8 +1,9 @@
 // Runs every test against its OWN database and server — never the working database.
-// Each run drops and recreates <DB_NAME>_test, loads the demo data, starts an API on port 4001,
-// runs the suites in order and stops the API. Usage: npm test
+// Each run drops and recreates <DB_NAME>_test (from baseline.sql + migrations), starts an API on port 4001,
+// runs the core suite and every module's tests (modules/*/test/*.mjs) and stops the API. Usage: npm test
 import "dotenv/config";
 import { execFileSync, spawn } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
 import mysql from "mysql2/promise";
 
 if (process.env.NODE_ENV === "production") {
@@ -18,14 +19,10 @@ Object.assign(process.env, {
   HOST: "127.0.0.1",
   PORT: "4001",
   APP_ORIGIN: "http://localhost:4001",
-  ALLOW_DEMO_RESET: "true",
-  // approved POs go to the fake Tally that tallysync.mjs runs on this port (nothing answers there otherwise)
-  TALLY_URL: "http://127.0.0.1:4011",
-  TALLY_ALLOW_WRITE: "true",
-  TALLY_COMPANY: "",
 });
 const BASE = "http://127.0.0.1:4001";
-const SUITES = ["gate", "grn", "flow", "purchase", "tallysync", "security", "parallel", "integrity", "reset", "production", "concurrency"]; // concurrency changes a password: last
+const SUITES = ["server/test/core.mjs", ...readdirSync("modules").flatMap((m) =>
+  existsSync(`modules/${m}/test`) ? readdirSync(`modules/${m}/test`).filter((f) => f.endsWith(".mjs")).map((f) => `modules/${m}/test/${f}`) : [])];
 const node = (args, opts = {}) => execFileSync(process.execPath, args, { stdio: "pipe", encoding: "utf8", ...opts });
 
 const admin = await mysql.createConnection({
@@ -37,22 +34,19 @@ await admin.query(`DROP DATABASE IF EXISTS \`${TEST_DB}\``);
 await admin.end();
 console.log(`test database ${TEST_DB}: setting up…`);
 node(["--import", "tsx", "server/scripts/setup.ts", "--dev-passwords"]);
-node(["--import", "tsx", "server/scripts/demo.ts"]);
 
 const api = spawn(process.execPath, ["--import", "tsx", "server/src/index.ts"], { stdio: "ignore" });
 for (let i = 0; ; i++) {
-  if (await fetch(`${BASE}/api/version`).then(() => true, () => false)) break;
+  if (await fetch(`${BASE}/api/health`).then(() => true, () => false)) break;
   if (i > 60) throw new Error("test API did not start");
   await new Promise((r) => setTimeout(r, 500));
 }
 
 let failed = 0;
 for (const suite of SUITES) {
-  // the API allows 600 requests a minute per address; let the window clear before the suites that need a quiet one
-  if (suite === "concurrency" || suite === "production") await new Promise((r) => setTimeout(r, 61_000));
   let out;
   try {
-    out = node([`server/test/${suite}.mjs`, BASE]);
+    out = node(["--import", "tsx", suite, BASE]);
   } catch (e) {
     failed++;
     out = String(e.stdout ?? "") + String(e.stderr ?? "");

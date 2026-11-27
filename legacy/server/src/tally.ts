@@ -7,6 +7,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { gstSplit } from "../../src/flow/logic";
 import type { FlowState, GstType, TallyPo } from "../../src/flow/types";
+import { config } from "./config";
 import type { Conn } from "./db";
 import { loadState, persistChanges, requestResync, skipTallyPoNumbers } from "./repository";
 
@@ -365,7 +366,8 @@ export async function saveTallyItems(conn: Conn, items: TallyItem[], boughtNow: 
     const prev = byCode.get(code);
     if (prev) {
       if (prev.name === name && prev.unit === unit && String(prev.tally_name ?? "").toLowerCase() === key) continue;
-      await conn.query("UPDATE components SET name = ?, unit = ?, tally_name = ?, active = 1 WHERE code = ?", [name.slice(0, 160), unit, name, code]);
+      // an item of the Purchase System's Item Master keeps its master name (that system finds items by name)
+      await conn.query("UPDATE components SET name = IF(ps_item_type <> '', name, ?), unit = ?, tally_name = ?, active = 1 WHERE code = ?", [name.slice(0, 160), unit, name, code]);
       renamed++;
     } else {
       await conn.query("INSERT INTO components (code, name, type, unit, tally_name) VALUES (?, ?, ?, ?, ?)", [
@@ -444,14 +446,17 @@ export async function syncFromTally(
 
   const items = parseTallyStockItems(await ask(stockItemRequest(o.company, sItems)));
   const vendors = parseTallyVendors(await ask(vendorRequest(o.company, sVendors)));
-  const read = parseTallyPurchaseOrders(await ask(purchaseOrderRequest(o.company, o.from, o.to, o.voucherTypes, sPos)), o.voucherTypes);
+  // POs are not read while TALLY_SYNC_POS is off (the copy already taken stays as it is)
+  const read = config.TALLY_SYNC_POS
+    ? parseTallyPurchaseOrders(await ask(purchaseOrderRequest(o.company, o.from, o.to, o.voucherTypes, sPos)), o.voucherTypes)
+    : { pos: [] as ReturnType<typeof parseTallyPurchaseOrders>["pos"], skipped: [] as ReturnType<typeof parseTallyPurchaseOrders>["skipped"], withoutItems: 0 };
 
   const it = await saveTallyItems(conn, items, read.pos.flatMap((p) => p.lines.map((l) => l.itemName)));
   const vendorsAdded = await saveTallyVendors(conn, vendors);
 
   let pos = read.pos;
   let cancelled = 0;
-  if (o.full) {
+  if (o.full && config.TALLY_SYNC_POS) {
     // A PO deleted in Tally: kept (gate entries point to it) but no longer open.
     const seen = new Set(read.pos.map((p) => p.guid).filter(Boolean));
     const skippedNos = new Set(read.skipped.map((x) => x.poNo));
